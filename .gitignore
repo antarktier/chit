@@ -1,0 +1,17 @@
+node_modules/
+coverage/
+dist/
+out/
+cache/
+.codegraph/
+.env*
+!.env.example
+keys/
+
+app/playwright-report/
+app/test-results/
+
+.wrangler/
+*.sqlite*
+results/
+.deployments-local/

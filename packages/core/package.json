@@ -1,0 +1,12 @@
+{
+  "name": "@chit/core",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@qorechain/pqc": "0.2.3",
+    "@qorechain/qoresign": "0.2.0",
+    "viem": "^2.58.6"
+  }
+}
