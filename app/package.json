@@ -1,0 +1,42 @@
+{
+  "name": "@chit/app",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vp dev",
+    "build": "vp build",
+    "test": "vp test run",
+    "test:e2e": "playwright test",
+    "preview": "vp preview"
+  },
+  "dependencies": {
+    "@base-ui/react": "^1.9.0",
+    "@chit/core": "workspace:*",
+    "@fontsource-variable/inter": "^5",
+    "@fontsource/ibm-plex-mono": "^5",
+    "@qorechain/qoresign": "0.2.0",
+    "@qorechain/qorex-types": "^0.1.0",
+    "@qorechain/sdk": "^0.14.0",
+    "@scure/bip39": "^2.0.0",
+    "cosmjs-types": "^0.11.0",
+    "lucide-react": "^1.80.0",
+    "qrcode": "^1.5.4",
+    "react": "^19",
+    "react-dom": "^19",
+    "viem": "^2.58.6"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.14.1",
+    "@playwright/test": "^1.61",
+    "@tailwindcss/vite": "^4",
+    "@testing-library/react": "^16",
+    "@testing-library/user-event": "^14.6.13",
+    "@types/node": "^22",
+    "@types/qrcode": "^1.5.5",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "jsdom": "^26",
+    "tailwindcss": "^4",
+    "typescript": "^5.9"
+  }
+}

@@ -1,0 +1,137 @@
+/* Recall / Hyge Design Tokens (ported from antarktier/recall & antarktier/hyge)
+ * - Neutral surface hierarchy: warm limestone canvas (--bg) + crisp white surfaces (--surface) in light,
+ *   deep obsidian (--bg) + elevated charcoal-green (--surface) in dark.
+ * - Brand overrides: projects override --accent, --accent-soft, --on-accent (and optionally --accent-hover)
+ *   in their own stylesheet after importing this file.
+ * - All foreground/background pairings meet WCAG 2.2 AA (>= 4.5:1 body, >= 3:1 large/UI).
+ */
+
+:root {
+  /* Core neutral surfaces & ink (Recall / Hyge) */
+  --bg: #f1f2ee;
+  --surface: #ffffff;
+  --ink: #1c2a23;
+  --muted: #5a6961;
+  --line: #e1e5de;
+  --hover: #1c2a230a;
+
+  /* Overridable primary brand accent (default: Recall graphite-ink) */
+  --accent: #1b1d1c;
+  --accent-hover: #2d312f;
+  --accent-soft: #e7e8e4;
+  --on-accent: #ffffff;
+
+  /* Semantic status tokens */
+  --danger: #a43b2f;
+  --danger-soft: #f9e8e6;
+  --success: #1f6b3b;
+  --success-soft: #e3f2e8;
+  --warn: #8c4708;
+  --warn-bg: #f8edd2;
+  --info: #1f5fa8;
+  --info-soft: #e6eff9;
+
+  /* Strict 5-step type scale + monospace */
+  --font-sans:
+    "Inter Variable", "Noto Sans TC Variable", -apple-system, BlinkMacSystemFont, "Segoe UI",
+    Roboto, "PingFang TC", "Microsoft JhengHei", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  --fs-display: clamp(2.125rem, 1.5rem + 2.8vw, 3.25rem);
+  --fs-lg: 1.25rem;
+  --fs-body: 1rem;
+  --fs-sm: 0.875rem;
+  --fs-xs: 0.75rem;
+
+  /* Layout & control geometry */
+  --gutter: 16px;
+  --column: 640px;
+  --column-wide: 1360px;
+  --sidebar-width: 216px;
+  --control: 40px;
+  --tabbar: 80px;
+
+  /* Deliberate radius scale (never abuse mega-rounded or harsh 0px boxes) */
+  --radius-surface: 16px;
+  --radius-control: 10px;
+  --radius-badge: 6px;
+  --radius-bar: 4px;
+  --radius-pill: 999px;
+  --radius: var(--radius-control);
+
+  /* Safe area insets (notches / dynamic island / mobile virtual keyboard) */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --keyboard-inset: 0px;
+
+  color-scheme: light dark;
+  font-family: var(--font-sans);
+  font-feature-settings: "cv11", "ss01";
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--ink);
+  background: var(--bg);
+  font-synthesis: none;
+  -webkit-text-size-adjust: 100%;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e100f;
+    --surface: #1a1f1c;
+    --ink: #e6ebe8;
+    --muted: #9ba6a0;
+    --line: #2a312d;
+    --hover: #ffffff0d;
+
+    --accent: #f2f3f1;
+    --accent-hover: #dde0dc;
+    --accent-soft: #222624;
+    --on-accent: #111312;
+
+    --danger: #f08b7e;
+    --danger-soft: #3a1f1c;
+    --success: #81c995;
+    --success-soft: #1a3323;
+    --warn: #f0b366;
+    --warn-bg: #3a3220;
+    --info: #8ab4f8;
+    --info-soft: #1b2a3e;
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #0e100f;
+  --surface: #1a1f1c;
+  --ink: #e6ebe8;
+  --muted: #9ba6a0;
+  --line: #2a312d;
+  --hover: #ffffff0d;
+
+  --accent: #f2f3f1;
+  --accent-hover: #dde0dc;
+  --accent-soft: #222624;
+  --on-accent: #111312;
+
+  --danger: #f08b7e;
+  --danger-soft: #3a1f1c;
+  --success: #81c995;
+  --success-soft: #1a3323;
+  --warn: #f0b366;
+  --warn-bg: #3a3220;
+  --info: #8ab4f8;
+  --info-soft: #1b2a3e;
+  color-scheme: dark;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+
+@media (pointer: coarse) {
+  :root {
+    --control: 44px;
+  }
+}

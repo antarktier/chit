@@ -4,6 +4,7 @@
   "private": true,
   "license": "Apache-2.0",
   "workspaces": [
+    "app",
     "packages/*",
     "service"
   ],
@@ -24,7 +25,9 @@
     "build:contracts": "forge build",
     "service:dev": "bun service/src/local.ts",
     "build:service": "bun build service/src/worker.ts --target browser --format esm --outfile service/dist/worker.js",
-    "devnet": "bun scripts/devnet.ts"
+    "devnet": "bun scripts/devnet.ts",
+    "test:e2e": "bun --filter @chit/app test:e2e",
+    "build:app": "bun --filter @chit/app build"
   },
   "dependencies": {
     "@chit/core": "workspace:*",
