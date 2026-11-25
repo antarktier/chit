@@ -4,7 +4,8 @@
   "private": true,
   "license": "Apache-2.0",
   "workspaces": [
-    "packages/*"
+    "packages/*",
+    "service"
   ],
   "type": "module",
   "scripts": {
@@ -20,7 +21,9 @@
     "diana:windows": "bun scripts/diana.ts windows",
     "diana:deploy": "bun scripts/diana.ts deploy",
     "diana:demo": "bun scripts/diana.ts demo",
-    "build:contracts": "forge build"
+    "build:contracts": "forge build",
+    "service:dev": "bun service/src/local.ts",
+    "build:service": "bun build service/src/worker.ts --target browser --format esm --outfile service/dist/worker.js"
   },
   "dependencies": {
     "@chit/core": "workspace:*",

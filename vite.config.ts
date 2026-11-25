@@ -9,6 +9,9 @@ export default defineConfig({
     ignorePatterns: ["**/fixtures/**", "keys/**", "**/dist/**"],
   },
   test: {
-    projects: [{ test: { name: "core", include: ["packages/core/test/**/*.test.ts"] } }],
+    projects: [
+      { test: { name: "core", include: ["packages/core/test/**/*.test.ts"] } },
+      { test: { name: "service", include: ["service/test/**/*.test.ts"], testTimeout: 60_000 } },
+    ],
   },
 });

@@ -9,5 +9,5 @@
     "types": ["bun"],
     "lib": ["ES2023", "DOM", "DOM.Iterable"]
   },
-  "include": ["packages", "scripts", "vite.config.ts"]
+  "include": ["packages", "scripts", "service/src", "service/test", "vite.config.ts"]
 }
