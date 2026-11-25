@@ -12,7 +12,7 @@ import type { Hex } from "viem";
 import { paths, reportPayment, useApi, type RequestDetail } from "../api";
 import { explorerTxUrl, keyStatus, useAsset } from "../chain";
 import { Button, EmptyState, SegmentedTabs } from "../components";
-import { exactUnits, formatUnits, parseAmount, unixDate } from "../format";
+import { exactUnits, formatCount, formatUnits, parseAmount, unixDate } from "../format";
 import { Link, useApp } from "../state";
 import {
   Amount,
@@ -274,15 +274,16 @@ export function Pay({ id }: { id: string }) {
           .map((event) => (
             <Notice
               key={event.key}
-              title={`${formatUnits(event.confirmations, 0)} of ${formatUnits(status.minConfirmations, 0)} confirmations`}
+              title={`${formatUnits(event.confirmations, 0)} of ${formatCount(status.minConfirmations, "confirmation")}`}
             >
               <Amount value={event.amount} asset={asset} />
             </Notice>
           ))}
       {unseen.length > 0 && (
         <Notice tone="success" title="Payment sent">
-          Chit counts it after {status ? formatUnits(status.minConfirmations, 0) : "a few"}{" "}
-          confirmations on QoreChain. This page updates on its own.{" "}
+          Chit counts it after{" "}
+          {status ? formatCount(status.minConfirmations, "confirmation") : "a few confirmations"} on
+          QoreChain. This page updates on its own.{" "}
           {unseen.map((s) => {
             const url = explorerTxUrl(ep, s.hash, s.source);
             return url ? (

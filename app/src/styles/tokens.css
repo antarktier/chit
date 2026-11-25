@@ -49,7 +49,7 @@
   --column-wide: 1360px;
   --sidebar-width: 216px;
   --control: 40px;
-  --tabbar: 80px;
+  --tabbar: 64px;
 
   /* Deliberate radius scale (never abuse mega-rounded or harsh 0px boxes) */
   --radius-surface: 16px;

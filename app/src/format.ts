@@ -30,6 +30,11 @@ export function exactUnits(value: bigint | string, decimals: number) {
   return `${v / base}${fraction ? "." + fraction : ""}`;
 }
 
+export function formatCount(count: number | bigint | string, singular: string, locale?: string) {
+  const value = BigInt(count);
+  return `${new Intl.NumberFormat(locale).format(value)} ${value === 1n ? singular : singular + "s"}`;
+}
+
 export type ParsedAmount = { ok: true; value: bigint } | { ok: false; error: string };
 
 /** Parses a typed amount such as `12.5`. Rejects grouping separators so `1,000` is never misread. */
@@ -42,7 +47,7 @@ export function parseAmount(input: string, decimals: number, maxFraction = decim
   if (fraction.length > maxFraction)
     return {
       ok: false,
-      error: `Use at most ${maxFraction} decimal places.`,
+      error: `Use at most ${formatCount(maxFraction, "decimal place")}.`,
     };
   const value =
     BigInt(whole!) * 10n ** BigInt(decimals) + BigInt(fraction.padEnd(decimals, "0") || "0");

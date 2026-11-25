@@ -11,7 +11,7 @@ import {
   MetricStrip,
   type TableColumn,
 } from "../components";
-import { formatUnits, statusLabel, unixDate } from "../format";
+import { formatCount, formatUnits, statusLabel, unixDate } from "../format";
 import { Link, useApp } from "../state";
 import { Amount, Notice, StatusBadge, When } from "../ui";
 
@@ -30,7 +30,7 @@ export function AssetAmount({ value, asset }: { value: string; asset: string }) 
   return info ? (
     <Amount value={value} asset={info} />
   ) : (
-    <span className="tabular">{formatUnits(value, 0)} base units</span>
+    <span className="tabular">{formatCount(value, "base unit")}</span>
   );
 }
 

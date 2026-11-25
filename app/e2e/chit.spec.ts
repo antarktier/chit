@@ -182,6 +182,14 @@ test("merchant signs a request, customer pays in two parts, receipt verifies", a
   await expect(page.getByRole("radio", { name: "Last 90 days" })).toBeChecked();
   await page.keyboard.press("ArrowLeft");
   await expect(page.getByRole("radio", { name: "Last 30 days" })).toBeChecked();
+  await expect(page.getByText("1 request", { exact: true })).toBeVisible();
+  if (test.info().project.name === "mobile") {
+    const exportHeading = page.getByRole("heading", { name: "Export records" });
+    await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+    const heading = await exportHeading.boundingBox();
+    const tabBar = await page.locator(".sidebar").boundingBox();
+    expect(heading!.y + heading!.height).toBeLessThan(tabBar!.y);
+  }
   await audit(page, "reports");
   await shot(page, "reports");
   const csvHref = await page.getByRole("link", { name: "Download CSV" }).getAttribute("href");

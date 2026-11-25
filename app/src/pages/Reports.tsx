@@ -11,7 +11,7 @@ import {
   ProgressRow,
   SegmentedTabs,
 } from "../components";
-import { formatUnits, statusLabel } from "../format";
+import { formatCount, formatUnits, statusLabel } from "../format";
 import { Link, useApp } from "../state";
 import { HashText, Notice } from "../ui";
 import { AssetAmount, nativeTotals } from "./Requests";
@@ -136,9 +136,7 @@ export function Reports() {
           <section className="section-stack" aria-labelledby="status-title">
             <div className="section-header">
               <h2 id="status-title">Requests by status</h2>
-              <span className="muted tabular">
-                {formatUnits(BigInt(s.requests), 0)} {s.requests === 1 ? "request" : "requests"}
-              </span>
+              <span className="muted tabular">{formatCount(s.requests, "request")}</span>
             </div>
             <GroupedList>
               {order.map((status) => {

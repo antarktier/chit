@@ -650,7 +650,7 @@ main {
     inset: auto calc(var(--gutter) + var(--safe-right)) calc(8px + var(--safe-bottom))
       calc(var(--gutter) + var(--safe-left));
     z-index: 40;
-    height: auto;
+    height: var(--tabbar);
     flex-direction: row;
     gap: 0;
     padding: 5px;
@@ -710,9 +710,12 @@ main {
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+  .app > main {
+    padding-bottom: calc(var(--tabbar) + var(--safe-bottom) + var(--keyboard-inset));
+  }
   .workspace {
-    padding: calc(14px + var(--safe-top)) calc(var(--gutter) + var(--safe-right))
-      calc(var(--tabbar) + 24px + var(--safe-bottom)) calc(var(--gutter) + var(--safe-left));
+    padding: calc(14px + var(--safe-top)) calc(var(--gutter) + var(--safe-right)) 24px
+      calc(var(--gutter) + var(--safe-left));
   }
 }
 

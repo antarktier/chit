@@ -21,7 +21,7 @@ import {
   ToggleSwitch,
   type ErrorItem,
 } from "../components";
-import { parseAmount } from "../format";
+import { formatCount, parseAmount } from "../format";
 import { Link, useApp } from "../state";
 import { Notice, TextField } from "../ui";
 import { connectQorex, hasQorex } from "../wallet";
@@ -205,7 +205,7 @@ export function NewRequest() {
               label="Token contract address"
               hint={
                 token
-                  ? `${token.symbol}, ${token.decimals} decimals`
+                  ? `${token.symbol}, ${formatCount(token.decimals, "decimal place")}`
                   : "The ERC-20 contract on QoreChain EVM (0x…)."
               }
               value={tokenText}

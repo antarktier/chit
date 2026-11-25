@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
-import { exactUnits, formatUnits, parseAmount, relative, shortHex } from "./format";
+import { exactUnits, formatCount, formatUnits, parseAmount, relative, shortHex } from "./format";
 
 describe("amount formatting", () => {
   it("groups the integer part and trims trailing zeros without floating point", () => {
@@ -39,6 +39,13 @@ describe("parseAmount", () => {
 });
 
 describe("misc", () => {
+  it("formats English count labels with locale grouping", () => {
+    expect(formatCount(0, "request", "en-US")).toBe("0 requests");
+    expect(formatCount("1", "confirmation", "en-US")).toBe("1 confirmation");
+    expect(formatCount(2n, "request", "en-US")).toBe("2 requests");
+    expect(formatCount(1234, "request", "de-DE")).toBe("1.234 requests");
+    expect(parseAmount("1.23", 1)).toEqual({ ok: false, error: "Use at most 1 decimal place." });
+  });
   it("shortens hashes", () => {
     expect(shortHex("0x" + "a".repeat(64), 6, 4)).toBe("0xaaaa…aaaa");
     expect(shortHex("0x1234")).toBe("0x1234");
