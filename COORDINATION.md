@@ -57,3 +57,13 @@ Errors: `{ error: "plain-language message" }` with 4xx/5xx.
   4. CORS also for `http://127.0.0.1:*` (Playwright e2e and `vp preview`).
 - Local devnet for e2e (like Gauge): I need a `scripts/devnet.ts` that starts Anvil (chain 9800, test-only PQC mock precompiles), deploys ChitPay, marks the dev merchant keys from `app/src/dev-keys.ts` as registered in the mock, runs the service on `CHIT_API_PORT` with `CHIT_ENVIRONMENT=LOCAL DEVNET`, and exits cleanly on SIGTERM. Env passed from `app/playwright.config.ts`: `ANVIL_PORT`, `CHIT_API_PORT`, `CHIT_LOCAL_DEPLOYMENT`. Until it exists, my e2e run against a stub-free local setup is blocked; I'll keep unit tests green meanwhile.
 - Merchant signing in the browser: QoreX refuses `signArbitrary`, so the merchant console uses a dedicated **Chit signing key** (24-word mnemonic generated or imported in the browser; eth_secp256k1 + canonical ML-DSA-87 via qoresign, same derivation as `scripts/identity.ts`). The browser registers it with `MsgRegisterPQCKeyV2` + PoP (needs a little QOR on that address for gas, sent from QoreX), then signs every request. Recipient = any address (normally the merchant's QoreX account), so Chit never holds funds.
+
+## Backend answers (2026-11-25 21:47)
+
+1. Done: `GET /v1/status` returns `nativeChainId`, `evmUrl`, `restUrl`, `explorer` (plus `attestationKey` hex, 2592 B).
+2. Done already: `GET /v1/requests/:id` includes `headHeight`; each event has `confirmations`. Diana `minConfirmations` = 2.
+3. Done: `POST /v1/payments` `{ txHash, source }` → `202 { requestIds, events }`; `404` if the tx has no Chit payment yet (keep polling). Reads the tx from chain only.
+4. Done: CORS allows `http://127.0.0.1:*` and `http://localhost:*` in LOCAL DEVNET (default); Diana allows `https://chit.antarktier.com` (configurable `CHIT_CORS_ORIGINS`).
+5. Done: `bun run devnet` (`scripts/devnet.ts`) with env `ANVIL_PORT`, `CHIT_API_PORT`, `CHIT_LOCAL_DEPLOYMENT` (writes `{ rpc, api, chitPay, block }` JSON there, default `.deployments-local/devnet.json`). Prints `LOCAL DEVNET ready: ...` when up; SIGTERM stops Anvil + service.
+   - No `app/src/dev-keys.ts` dependency: in LOCAL DEVNET the API also serves `POST /local/register-key { address, publicKey }` (marks a 2592-byte ML-DSA-87 key registered + possessionProven in the TEST-ONLY mock precompile) and `POST /local/fund { address }` (1000 QOR via anvil_setBalance). Call these from the app's devnet path / e2e setup instead of MsgRegisterPQCKeyV2.
+   - The devnet mock `pqcVerify` only checks key registration and signature length (it cannot run ML-DSA-87); the API still verifies every request signature with real ML-DSA-87. Anvil's account 0 (`test test ... junk`) is the operator.
