@@ -42,6 +42,6 @@ export function config(env: Record<string, string | undefined>): Config {
     attestationSeed: env.CHIT_ATTESTATION_SEED,
     blocksPerTick: BigInt(env.CHIT_BLOCKS_PER_TICK ?? "5000"),
     environment: env.CHIT_ENVIRONMENT === "LOCAL DEVNET" ? "LOCAL DEVNET" : "DIANA",
-    explorer: env.CHIT_EXPLORER ?? diana.explorer,
+    explorer: env.CHIT_EXPLORER ?? (env.CHIT_ENVIRONMENT === "LOCAL DEVNET" ? "" : diana.explorer),
   };
 }

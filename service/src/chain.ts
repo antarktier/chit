@@ -34,6 +34,7 @@ const pqcAbi = parseAbi([
 
 export function dianaSource(cfg: Config): ChainSource {
   const evm = createPublicClient({
+    cacheTime: 0,
     transport: http(cfg.evmUrl, { timeout: 15_000, retryCount: 2, batch: { batchSize: 40 } }),
   });
   return {

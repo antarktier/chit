@@ -5,7 +5,6 @@ import {
   deserializeRequest,
   eventKey,
   EVM_CHAIN_ID,
-  explorerTx,
   NATIVE_CHAIN_ID,
   nativePaymentEvents,
   hashDetails,
@@ -151,10 +150,16 @@ export function api(store: Store, chain: ChainSource, cfg: Config) {
   const keyHex = key ? bytesToHex(key.publicKey) : undefined;
 
   async function head() {
-    const [row] = await store.all<{ value: string }>(
-      "SELECT value FROM cursors WHERE name = 'head'",
-    );
-    return row ? BigInt(row.value) : await chain.head();
+    // Live head so confirmations are current; fall back to the indexer's last seen head.
+    try {
+      return await chain.head();
+    } catch {
+      const [row] = await store.all<{ value: string }>(
+        "SELECT value FROM cursors WHERE name = 'head'",
+      );
+      if (!row) throw new HttpError(503, "QoreChain RPC is unavailable");
+      return BigInt(row.value);
+    }
   }
 
   async function loadRow(id: string) {
@@ -190,7 +195,7 @@ export function api(store: Store, chain: ChainSource, cfg: Config) {
         amount: e.event.amount.toString(),
         confirmations: e.confirmations.toString(),
         class: e.class,
-        explorerUrl: explorerTx(String(e.event.txHash)),
+        explorerUrl: cfg.explorer ? `${cfg.explorer}/tx/${String(e.event.txHash)}` : null,
       })),
       rec,
     };

@@ -95,7 +95,7 @@ try {
       CHIT_MIN_CONFIRMATIONS: "1",
       CHIT_API_PORT: String(apiPort),
       CHIT_SQLITE: ":memory:",
-      CHIT_EXPLORER: rpc,
+      CHIT_EXPLORER: "",
       // Deterministic, test-only attestation seed for the devnet.
       CHIT_ATTESTATION_SEED: `0x${"11".repeat(32)}`,
       CHIT_DEVNET_OPERATOR_MNEMONIC: mnemonic,
