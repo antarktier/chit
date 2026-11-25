@@ -235,50 +235,47 @@ export function api(store: Store, chain: ChainSource, cfg: Config) {
       throw new HttpError(409, "This reference is already used by another request");
     if (existing) return { status: 200, id };
     const now = new Date().toISOString();
-    await store.batch([
-      [
-        "INSERT INTO requests (id, merchant, reference, recipient, asset, amount, expires_at, partial_allowed, pay_contract, details, request_json, signature_json, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-        id,
+    const h = await head();
+    const backfill = [];
+    for (let from = cfg.startBlock; from <= h; from += 2_000n) {
+      const to = from + 1_999n < h ? from + 1_999n : h;
+      for (const event of await chain.paymentLogs(from, to, id as Hex))
+        backfill.push(insertEvent(event, eventKey(event), now));
+    }
+    try {
+      await store.batch([
+        [
+          "INSERT INTO requests (id, merchant, reference, recipient, asset, amount, expires_at, partial_allowed, pay_contract, details, request_json, signature_json, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+          id,
+          request.merchant,
+          request.reference,
+          request.recipient,
+          request.asset,
+          request.amount.toString(),
+          Number(request.expiresAt),
+          request.partialAllowed ? 1 : 0,
+          request.payContract,
+          body.details,
+          JSON.stringify(serializeRequest(request)),
+          JSON.stringify(body.signature),
+          now,
+          now,
+        ],
+        // Rescan this recipient's native history so payments made before registration are found.
+        ["DELETE FROM cursors WHERE name = ?", `native:${toBech32(request.recipient)}`],
+        ...backfill,
+      ]);
+    } catch (error) {
+      const [winner] = await store.all<{ id: string }>(
+        "SELECT id FROM requests WHERE merchant = ? AND reference = ?",
         request.merchant,
         request.reference,
-        request.recipient,
-        request.asset,
-        request.amount.toString(),
-        Number(request.expiresAt),
-        request.partialAllowed ? 1 : 0,
-        request.payContract,
-        body.details,
-        JSON.stringify(serializeRequest(request)),
-        JSON.stringify(body.signature),
-        now,
-        now,
-      ],
-      // Rescan this recipient's native history so payments made before registration are found.
-      ["DELETE FROM cursors WHERE name = ?", `native:${toBech32(request.recipient)}`],
-    ]);
-    // Backfill EVM logs for this request ID.
-    const h = await chain.head();
-    const insert = [];
-    for (let from = cfg.startBlock; from <= h; from += 10_000n) {
-      const to = from + 9_999n < h ? from + 9_999n : h;
-      for (const e of await chain.paymentLogs(from, to, id as Hex))
-        insert.push([
-          "INSERT OR IGNORE INTO events (key, request_id, source, tx_hash, idx, block_height, block_time, payer, recipient, asset, amount, indexed_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
-          `evm:${String(e.txHash).toLowerCase()}:${e.index}`,
-          id,
-          "evm",
-          String(e.txHash).toLowerCase(),
-          e.index,
-          Number(e.blockHeight),
-          Number(e.blockTime),
-          e.payer,
-          e.recipient,
-          e.asset,
-          e.amount.toString(),
-          now,
-        ] as [string, ...(string | number)[]]);
+      );
+      if (!winner) throw error;
+      if (winner.id !== id)
+        throw new HttpError(409, "This reference is already used by another request");
+      return { status: 200, id };
     }
-    if (insert.length) await store.batch(insert);
     return { status: 201, id };
   }
 
@@ -351,7 +348,15 @@ export function api(store: Store, chain: ChainSource, cfg: Config) {
         const row = await loadRow(parts[2]!);
         const d = await detail(row);
         const receipt = buildReceipt(d.request, d.signature, d.rec, new Date());
-        return json(signReceipt(receipt, key));
+        return json(
+          signReceipt(receipt, key),
+          200,
+          url.searchParams.has("download")
+            ? {
+                "content-disposition": `attachment; filename="chit-receipt-${d.request.reference}.json"`,
+              }
+            : undefined,
+        );
       }
     }
     if (req.method === "GET" && parts[1] === "merchants" && parts.length === 4) {
@@ -392,13 +397,26 @@ export function api(store: Store, chain: ChainSource, cfg: Config) {
         let requested = 0n;
         let received = 0n;
         let outstanding = 0n;
+        const assets = new Map<
+          string,
+          { requested: bigint; received: bigint; outstanding: bigint }
+        >();
         for (const r of rows) {
           byStatus[r.status] = (byStatus[r.status] ?? 0) + 1;
-          requested += BigInt(r.amount);
-          received += BigInt(r.paid);
-          if (r.status === "unpaid" || r.status === "partially_paid")
-            outstanding +=
-              BigInt(r.amount) > BigInt(r.paid) ? BigInt(r.amount) - BigInt(r.paid) : 0n;
+          const amount = BigInt(r.amount);
+          const paid = BigInt(r.paid);
+          const owed =
+            (r.status === "unpaid" || r.status === "partially_paid") && amount > paid
+              ? amount - paid
+              : 0n;
+          const totals = assets.get(r.asset) ?? { requested: 0n, received: 0n, outstanding: 0n };
+          totals.requested += amount;
+          totals.received += paid;
+          totals.outstanding += owed;
+          assets.set(r.asset, totals);
+          requested += amount;
+          received += paid;
+          outstanding += owed;
         }
         return json({
           merchant,
@@ -407,6 +425,12 @@ export function api(store: Store, chain: ChainSource, cfg: Config) {
           requested: requested.toString(),
           received: received.toString(),
           outstanding: outstanding.toString(),
+          byAsset: Array.from(assets, ([asset, totals]) => ({
+            asset,
+            requested: totals.requested.toString(),
+            received: totals.received.toString(),
+            outstanding: totals.outstanding.toString(),
+          })),
         });
       }
       if (parts[3] === "export") {

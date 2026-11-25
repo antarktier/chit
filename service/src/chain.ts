@@ -67,6 +67,7 @@ export function dianaSource(cfg: Config): ChainSource {
       const receipt = await evm.getTransactionReceipt({ hash }).catch(() => undefined);
       if (!receipt || receipt.status !== "success") return [];
       const block = await evm.getBlock({ blockNumber: receipt.blockNumber });
+      if (block.hash !== receipt.blockHash) return [];
       const out: PaymentEvent[] = [];
       for (const log of receipt.logs) {
         if (getAddress(log.address) !== cfg.chitPay) continue;

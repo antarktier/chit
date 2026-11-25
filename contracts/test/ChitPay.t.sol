@@ -112,6 +112,21 @@ contract ChitPayTest is QorePQCMockTest {
         pay.payNative{value: 1 ether}(r, _sig(r));
     }
 
+    function test_partialPaymentAtExpiryCannotBeCompletedAfterExpiry() public {
+        ChitPay.PaymentRequest memory r = _req(address(0), 1 ether, true, "CH-REF-DEADLINE");
+        vm.warp(r.expiresAt);
+        vm.prank(PAYER);
+        pay.payNative{value: 0.4 ether}(r, _sig(r));
+
+        vm.warp(r.expiresAt + 1);
+        vm.expectRevert(abi.encodeWithSelector(ChitPay.Expired.selector));
+        vm.prank(PAYER);
+        pay.payNative{value: 0.6 ether}(r, "");
+
+        assert(pay.outstanding(r) == 0.6 ether);
+        assert(RECIPIENT.balance == 0.4 ether);
+    }
+
     function test_rejectsUnprovenMerchantKey() public {
         keys.setKeyStatus(MERCHANT, MockQorePQC.KeyStatus(true, 1, PUBKEY, false));
         ChitPay.PaymentRequest memory r = _req(address(0), 1 ether, false, "CH-REF-7");

@@ -92,7 +92,7 @@ try {
       CHIT_EVM_URL: rpc,
       CHIT_PAY: chitPay,
       CHIT_START_BLOCK: String(receipt.blockNumber),
-      CHIT_MIN_CONFIRMATIONS: "1",
+      CHIT_MIN_CONFIRMATIONS: process.env.CHIT_MIN_CONFIRMATIONS ?? "1",
       CHIT_API_PORT: String(apiPort),
       CHIT_SQLITE: ":memory:",
       CHIT_EXPLORER: "",

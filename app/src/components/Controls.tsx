@@ -1,4 +1,6 @@
 import { Select as BaseSelect } from "@base-ui/react/select";
+import { Radio } from "@base-ui/react/radio";
+import { RadioGroup } from "@base-ui/react/radio-group";
 import { Check, ChevronDown, Search, X } from "lucide-react";
 import { useId, type ButtonHTMLAttributes, type ReactNode } from "react";
 
@@ -48,19 +50,13 @@ export function SegmentedTabs<T extends string = string>({
   onChange: (next: T) => void;
 }) {
   return (
-    <div className="segments" role="tablist" aria-label={label}>
+    <RadioGroup className="segments" aria-label={label} value={value} onValueChange={onChange}>
       {options.map((opt) => (
-        <button
-          key={opt.value}
-          type="button"
-          role="tab"
-          aria-selected={value === opt.value}
-          onClick={() => onChange(opt.value)}
-        >
+        <Radio.Root key={opt.value} value={opt.value}>
           {opt.label}
-        </button>
+        </Radio.Root>
       ))}
-    </div>
+    </RadioGroup>
   );
 }
 
@@ -82,20 +78,14 @@ export function FilterChips<T extends string = string>({
   onChange: (next: T) => void;
 }) {
   return (
-    <div className="chips" role="radiogroup" aria-label={label}>
+    <RadioGroup className="chips" aria-label={label} value={value} onValueChange={onChange}>
       {options.map((opt) => (
-        <button
-          key={opt.value}
-          type="button"
-          role="radio"
-          aria-checked={value === opt.value}
-          onClick={() => onChange(opt.value)}
-        >
+        <Radio.Root key={opt.value} value={opt.value}>
           {opt.label}
           {opt.count !== undefined && <span>{opt.count}</span>}
-        </button>
+        </Radio.Root>
       ))}
-    </div>
+    </RadioGroup>
   );
 }
 

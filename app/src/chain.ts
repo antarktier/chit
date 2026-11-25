@@ -40,7 +40,7 @@ export function endpoints(status?: ServiceStatus): Endpoints {
       status?.evmUrl ??
       (local ? import.meta.env.VITE_CHIT_LOCAL_EVM || "http://127.0.0.1:8545" : diana.evm),
     rest: status?.restUrl ?? diana.rest,
-    explorer: diana.explorer,
+    explorer: status?.explorer ?? diana.explorer,
   };
 }
 
@@ -123,6 +123,7 @@ export interface AssetInfo {
   native: boolean;
   symbol: string;
   decimals: number;
+  metadataUnavailable?: true;
 }
 
 export const QOR: AssetInfo = {
@@ -171,11 +172,17 @@ export function useAsset(ep: Endpoints, asset: string | undefined) {
       .catch(
         () =>
           live &&
-          setInfo({ address: asset as Address, native: false, symbol: "tokens", decimals: 0 }),
+          setInfo({
+            address: asset as Address,
+            native: false,
+            symbol: "base units",
+            decimals: 0,
+            metadataUnavailable: true,
+          }),
       );
     return () => {
       live = false;
     };
   }, [ep, asset]);
-  return info;
+  return info?.address.toLowerCase() === asset?.toLowerCase() ? info : undefined;
 }

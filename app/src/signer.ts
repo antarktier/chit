@@ -12,7 +12,7 @@ import { wordlist } from "@scure/bip39/wordlists/english.js";
 import { bytesToHex, getAddress, hexToBytes, type Address } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import type { Endpoints } from "./chain";
-import { DEV_MERCHANT_INDEX, devIdentity } from "./dev-keys";
+import { devnet } from "./api";
 
 /**
  * A merchant's Chit signing key: eth_secp256k1 + canonical ML-DSA-87 derived from one
@@ -20,13 +20,13 @@ import { DEV_MERCHANT_INDEX, devIdentity } from "./dev-keys";
  * messages yet, so requests are signed here, in the browser, and never leave it unsigned.
  */
 export interface SigningKey {
-  kind: "phrase" | "dev";
+  kind: "phrase";
   address: Address;
   bech32: string;
   classical: ClassicalKey;
   pq: ReturnType<typeof deriveCanonicalPqKey>;
-  /** Only for `phrase` keys: shown once on creation and available for backup. */
-  phrase?: string;
+  /** The 24-word recovery phrase, available for backup. */
+  phrase: string;
 }
 
 const STORAGE_KEY = "chit-signing-key";
@@ -62,20 +62,8 @@ export function keyFromPhrase(phrase: string): SigningKey {
   };
 }
 
-/** LOCAL DEVNET ONLY: the deterministic merchant identity the devnet script registers in the mock. */
-export function devKey(): SigningKey {
-  const id = devIdentity(DEV_MERCHANT_INDEX);
-  return {
-    kind: "dev",
-    address: id.address,
-    bech32: id.bech32,
-    classical: id.classical,
-    pq: id.pq,
-  };
-}
-
 interface Stored {
-  kind: "phrase" | "dev";
+  kind: "phrase";
   phrase?: string;
 }
 
@@ -95,7 +83,6 @@ export function loadKey(): { key: SigningKey; remembered: boolean } | undefined 
       const raw = storage.getItem(STORAGE_KEY);
       if (!raw) continue;
       const stored = JSON.parse(raw) as Stored;
-      if (stored.kind === "dev") return { key: devKey(), remembered };
       if (stored.phrase && isValidPhrase(stored.phrase))
         return { key: keyFromPhrase(stored.phrase), remembered };
     } catch {
@@ -124,8 +111,11 @@ export const registrationFeeUqor = (REGISTRATION_GAS * 15n + 99n) / 100n;
  * Signed classically because the account has no PQC key yet; the chain accepts only this message that way.
  */
 export async function registerKey(ep: Endpoints, key: SigningKey) {
-  if (ep.environment !== "DIANA")
-    throw new Error("On the local devnet the devnet script registers the key in the mock.");
+  if (ep.environment === "LOCAL DEVNET") {
+    // TEST-ONLY: the devnet service writes the key into the mock pqcKeyStatus precompile.
+    await devnet.registerKey(key.address, bytesToHex(key.pq.publicKey));
+    return "";
+  }
   const { calculateFee, signClassicalEth } = await import("@qorechain/sdk");
   const message = buildRegisterPqKeyMessage({
     chainId: NATIVE_CHAIN_ID,

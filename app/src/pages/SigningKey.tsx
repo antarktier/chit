@@ -14,7 +14,6 @@ import {
 } from "../components";
 import { formatUnits } from "../format";
 import {
-  devKey,
   isValidPhrase,
   keyFromPhrase,
   newPhrase,
@@ -29,8 +28,7 @@ import { hasQorex, sendFromQorex } from "../wallet";
 const FUNDING_UQOR = 100_000n;
 
 function SetupKey() {
-  const { status, setKey } = useApp();
-  const local = status?.environment === "LOCAL DEVNET";
+  const { setKey } = useApp();
   const [mode, setMode] = useState<"create" | "import">("create");
   const [phrase, setPhrase] = useState(() => newPhrase());
   const [saved, setSaved] = useState(false);
@@ -41,14 +39,6 @@ function SetupKey() {
   const words = phrase.split(" ");
   return (
     <div className="section-stack narrow">
-      {local && (
-        <Notice title="Local devnet">
-          The devnet script registers a test merchant key in the test-only PQC mock.{" "}
-          <Button variant="text" onClick={() => setKey(devKey(), false)}>
-            Use the devnet merchant key
-          </Button>
-        </Notice>
-      )}
       <SegmentedTabs
         label="How to add a signing key"
         value={mode}
@@ -182,9 +172,10 @@ export function SigningKeyPage() {
     setNotice(undefined);
     try {
       const tx = await action();
-      setNotice({ tone: "success", text: done, tx });
-      for (let i = 0; i < 10; i++) {
-        await new Promise((r) => setTimeout(r, 2500));
+      setNotice({ tone: "success", text: done, tx: tx || undefined });
+      setBusy(undefined);
+      for (let i = 0; i < (local ? 1 : 8); i++) {
+        if (!local) await new Promise((r) => setTimeout(r, 3000));
         await refresh();
       }
     } catch (error) {
@@ -229,13 +220,7 @@ export function SigningKeyPage() {
           <SettingRow label="Algorithms" value="ML-DSA-87 (FIPS 204) with secp256k1" />
           <SettingRow
             label="Stored"
-            value={
-              key.kind === "dev"
-                ? "Devnet test key"
-                : remembered
-                  ? "On this device until removed"
-                  : "Until this tab closes"
-            }
+            value={remembered ? "On this device until removed" : "Until this tab closes"}
           />
         </GroupedList>
       </FieldGroup>
@@ -263,13 +248,15 @@ export function SigningKeyPage() {
           )}
         </GroupedList>
       </FieldGroup>
-      {!registered && chain.status && !local && (
+      {!registered && chain.status && (
         <div className="surface-card card-pad">
           <h2 className="card-title">Register the key</h2>
           <p className="muted">
             Customers and the ChitPay contract check your request signatures against the key
-            registered for this address. Registration costs about{" "}
-            {formatUnits(registrationFeeUqor, 6)} QOR in fees.
+            registered for this address.{" "}
+            {local
+              ? "On the local devnet the key is written into the test-only PQC mock."
+              : `Registration costs about ${formatUnits(registrationFeeUqor, 6)} QOR in fees.`}
           </p>
           {needsFunds && (
             <>
@@ -307,7 +294,9 @@ export function SigningKeyPage() {
                 void run(
                   "register",
                   () => registerKey(ep, key),
-                  "Registration sent. It takes effect after the next block.",
+                  local
+                    ? "Key registered in the devnet mock."
+                    : "Registration sent. It takes effect after the next block.",
                 )
               }
             >
@@ -320,12 +309,10 @@ export function SigningKeyPage() {
           </div>
         </div>
       )}
-      {key.phrase && (
-        <Disclosure summary="Show recovery phrase">
-          <p className="muted">Anyone with these words can sign requests as you.</p>
-          <p className="mono wrap">{key.phrase}</p>
-        </Disclosure>
-      )}
+      <Disclosure summary="Show recovery phrase">
+        <p className="muted">Anyone with these words can sign requests as you.</p>
+        <p className="mono wrap">{key.phrase}</p>
+      </Disclosure>
       <div className="actions">
         <Button variant="text" danger onClick={() => setConfirmForget(true)}>
           <KeyRound size={15} aria-hidden="true" />

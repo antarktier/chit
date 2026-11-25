@@ -19,9 +19,10 @@ export interface ServiceStatus {
   lagBlocks: string;
   minConfirmations: string;
   attestationKey: `0x${string}` | null;
-  /** Optional: endpoints the service reads (falls back to Diana defaults). */
+  nativeChainId?: string;
   evmUrl?: string;
   restUrl?: string;
+  explorer?: string;
 }
 
 export interface Reconciliation {
@@ -217,3 +218,26 @@ export function useApi<T>(path: string | undefined, interval = 0, revision = 0) 
   }, [path, interval, revision]);
   return state.key === path ? state : {};
 }
+
+/** Fast path: ask the service to index this tx now. It reads the tx from chain; 404 = not found yet. */
+export async function reportPayment(txHash: string, source: "evm" | "native", attempts = 6) {
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await post<{ requestIds: string[]; events: number }>("/v1/payments", {
+        txHash,
+        source,
+      });
+    } catch (error) {
+      if (!(error instanceof ApiError) || (error.status !== 404 && error.status !== 0)) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 2500));
+    }
+  }
+  return undefined;
+}
+
+/** LOCAL DEVNET ONLY: helpers served by `scripts/devnet.ts` (test-only PQC mock, Anvil balances). */
+export const devnet = {
+  registerKey: (address: string, publicKey: string) =>
+    post<{ registered: boolean }>("/local/register-key", { address, publicKey }),
+  fund: (address: string) => post<{ balance: string }>("/local/fund", { address }),
+};

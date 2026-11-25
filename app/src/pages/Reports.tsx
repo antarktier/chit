@@ -1,13 +1,20 @@
-import type { PaymentStatus } from "@chit/core";
+import { NATIVE_ASSET, type PaymentStatus } from "@chit/core";
 import { Download } from "lucide-react";
 import { useMemo, useState } from "react";
 import { paths, useApi, type MerchantSummary, type RequestSummary } from "../api";
 import { QOR } from "../chain";
-import { EmptyState, GroupedList, MetricStrip, ProgressRow, SegmentedTabs } from "../components";
+import {
+  DataTable,
+  EmptyState,
+  GroupedList,
+  MetricStrip,
+  ProgressRow,
+  SegmentedTabs,
+} from "../components";
 import { formatUnits, statusLabel } from "../format";
 import { Link, useApp } from "../state";
-import { Notice } from "../ui";
-import { nativeTotals } from "./Requests";
+import { HashText, Notice } from "../ui";
+import { AssetAmount, nativeTotals } from "./Requests";
 
 type Period = "7" | "30" | "90" | "all";
 const order: PaymentStatus[] = ["unpaid", "partially_paid", "completed", "overpaid", "expired"];
@@ -46,6 +53,7 @@ export function Reports() {
 
   const s = summary.data;
   const native = s && nativeTotals(s);
+  const tokens = s?.byAsset?.filter((row) => row.asset.toLowerCase() !== NATIVE_ASSET) ?? [];
   const qor = (v: string) => `${formatUnits(v, QOR.decimals)} QOR`;
   const collected =
     native && BigInt(native.requested) > 0n
@@ -91,10 +99,46 @@ export function Reports() {
               ]}
             />
           )}
+          {tokens.length > 0 && (
+            <section className="section-stack" aria-labelledby="token-balances">
+              <div className="section-header">
+                <h2 id="token-balances">Token balances by asset</h2>
+              </div>
+              <DataTable
+                caption="Token balances by asset"
+                rows={tokens}
+                rowKey={(row) => row.asset}
+                columns={[
+                  {
+                    key: "asset",
+                    header: "Token contract",
+                    render: (row) => <HashText value={row.asset} label="Token contract" />,
+                  },
+                  {
+                    key: "requested",
+                    header: "Requested",
+                    render: (row) => <AssetAmount asset={row.asset} value={row.requested} />,
+                  },
+                  {
+                    key: "received",
+                    header: "Received",
+                    render: (row) => <AssetAmount asset={row.asset} value={row.received} />,
+                  },
+                  {
+                    key: "outstanding",
+                    header: "Outstanding",
+                    render: (row) => <AssetAmount asset={row.asset} value={row.outstanding} />,
+                  },
+                ]}
+              />
+            </section>
+          )}
           <section className="section-stack" aria-labelledby="status-title">
             <div className="section-header">
               <h2 id="status-title">Requests by status</h2>
-              <span className="muted tabular">{formatUnits(BigInt(s.requests), 0)} requests</span>
+              <span className="muted tabular">
+                {formatUnits(BigInt(s.requests), 0)} {s.requests === 1 ? "request" : "requests"}
+              </span>
             </div>
             <GroupedList>
               {order.map((status) => {

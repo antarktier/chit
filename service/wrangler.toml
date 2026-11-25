@@ -1,0 +1,25 @@
+name = "chit-api"
+main = "dist/worker.js"
+compatibility_date = "2026-06-01"
+workers_dev = false
+preview_urls = false
+
+routes = [{ pattern = "chit-api.antarktier.com", custom_domain = true }]
+
+[triggers]
+crons = ["* * * * *"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "chit-diana"
+database_id = "073f9946-eb59-49a7-ad23-9492f65c51c6"
+migrations_dir = "migrations"
+
+[vars]
+CHIT_ENVIRONMENT = "DIANA"
+CHIT_PAY = "0x0B0dCCbbE4379c02cf9743153aF9B670Ab7BfFdb"
+CHIT_START_BLOCK = "10731448"
+CHIT_MIN_CONFIRMATIONS = "2"
+CHIT_CORS_ORIGINS = "https://chit.antarktier.com,http://localhost:*,http://127.0.0.1:*"
+CHIT_BLOCKS_PER_TICK = "5000"
+# Secret: CHIT_ATTESTATION_SEED (wrangler secret put CHIT_ATTESTATION_SEED --config service/wrangler.toml)

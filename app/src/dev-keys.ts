@@ -1,14 +1,12 @@
 import { addressFromBytes, deriveCanonicalPqKey, deriveClassicalKey } from "@qorechain/qoresign";
-import { bytesToHex, encodeAbiParameters, hexToBytes, keccak256, type Hex } from "viem";
+import { bytesToHex, hexToBytes } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 
 /**
- * LOCAL DEVNET ONLY. Anvil's public test mnemonic. These identities exist so the
- * Playwright suite and local development can run against a loopback Anvil with the
- * labelled test-only PQC mock precompiles. They are never offered on Diana.
+ * LOCAL DEVNET ONLY. Anvil's public test mnemonic. The payer identity lets the Playwright
+ * suite and local development pay from a loopback Anvil account. Never used on Diana.
  */
 export const devMnemonic = "test test test test test test test test test test test junk";
-export const DEV_MERCHANT_INDEX = 1;
 export const DEV_PAYER_INDEX = 2;
 
 export function devIdentity(index: number) {
@@ -26,14 +24,4 @@ export function devIdentity(index: number) {
     classical,
     pq: deriveCanonicalPqKey({ mnemonic: devMnemonic, address: bech32 }),
   };
-}
-
-/** Signature the test-only MockQorePQC precompile accepts: keccak256(abi.encode(pubkey, message)). */
-export function mockPqSignature(publicKey: Uint8Array, message: Uint8Array): Hex {
-  return keccak256(
-    encodeAbiParameters(
-      [{ type: "bytes" }, { type: "bytes" }],
-      [bytesToHex(publicKey), bytesToHex(message)],
-    ),
-  );
 }

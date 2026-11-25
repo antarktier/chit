@@ -1,5 +1,6 @@
 import {
   deserializeRequest,
+  eventKey,
   nativePaymentEvents,
   reconcile,
   toBech32,
@@ -80,7 +81,6 @@ export async function indexOnce(store: Store, chain: ChainSource, cfg: Config, n
     (await store.all<{ id: string }>("SELECT id FROM requests")).map((r) => r.id.toLowerCase()),
   );
   const statements: Statement[] = [];
-  const keyOf = (e: PaymentEvent) => `${e.source}:${String(e.txHash).toLowerCase()}:${e.index}`;
 
   // EVM: scan forward from the stored cursor in bounded chunks.
   const last = await cursor(store, "evm_block");
@@ -90,8 +90,7 @@ export async function indexOnce(store: Store, chain: ChainSource, cfg: Config, n
   while (from <= until) {
     const to = from + 1999n < until ? from + 1999n : until;
     for (const e of await chain.paymentLogs(from, to)) {
-      if (!known.has(e.requestId.toLowerCase())) continue;
-      statements.push(insertEvent(e, keyOf(e), iso));
+      statements.push(insertEvent(e, eventKey(e), iso));
       evmEvents++;
     }
     from = to + 1n;
@@ -110,7 +109,7 @@ export async function indexOnce(store: Store, chain: ChainSource, cfg: Config, n
     const name = `native:${bech32}`;
     const seen = BigInt((await cursor(store, name)) ?? "0");
     let top = seen;
-    for (let page = 1; page <= 5; page++) {
+    for (let page = 1; ; page++) {
       const txs = await chain.nativeTxsTo(bech32, page, 50);
       let done = txs.length < 50;
       for (const tx of txs) {
@@ -122,7 +121,7 @@ export async function indexOnce(store: Store, chain: ChainSource, cfg: Config, n
         if (height > top) top = height;
         for (const e of nativePaymentEvents(tx)) {
           if (!known.has(e.requestId.toLowerCase())) continue;
-          statements.push(insertEvent(e, keyOf(e), iso));
+          statements.push(insertEvent(e, eventKey(e), iso));
           nativeEvents++;
         }
       }

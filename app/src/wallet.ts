@@ -4,7 +4,6 @@ import {
   memoForRequest,
   NATIVE_CHAIN_ID,
   referenceToBytes32,
-  requestMessageBytes,
   toBech32,
   UQOR_TO_WEI,
   type PaymentRequest,
@@ -24,8 +23,9 @@ import {
   type EIP1193Provider,
   type Hex,
 } from "viem";
-import { evmChain, keyStatus, publicClient, tokenAbi, type Endpoints } from "./chain";
-import { DEV_PAYER_INDEX, devIdentity, mockPqSignature } from "./dev-keys";
+import { evmChain, publicClient, tokenAbi, type Endpoints } from "./chain";
+import { devnet } from "./api";
+import { DEV_PAYER_INDEX, devIdentity } from "./dev-keys";
 
 type QorexWindow = Window & {
   qorex?: { native?: QorexNativeProvider; evm?: EIP1193Provider };
@@ -190,11 +190,14 @@ async function payerWallet(ep: Endpoints) {
     if (url.hostname !== "127.0.0.1" && url.hostname !== "localhost")
       throw new Error("Local devnet payments need a loopback Anvil RPC.");
     const { account } = devIdentity(DEV_PAYER_INDEX);
+    if ((await publicClient(ep.evm).getBalance({ address: account.address })) === 0n)
+      await devnet.fund(account.address);
     return {
       account: account.address,
       client: createWalletClient({ account, chain, transport: http(ep.evm) }),
     };
   }
+  const native = await connectQorex();
   const provider = await evmProvider();
   const [first] = (await provider.request({ method: "eth_requestAccounts" })) as string[];
   if (!first) throw new Error("QoreX did not share an EVM account.");
@@ -205,6 +208,8 @@ async function payerWallet(ep: Endpoints) {
       params: [{ chainId: `0x${chain.id.toString(16)}` }],
     });
   const account = getAddress(first);
+  if (account !== native.address)
+    throw new Error("Select the same account in QoreX for native and EVM payments.");
   return {
     account,
     client: createWalletClient({ account, chain, transport: custom(provider, { retryCount: 0 }) }),
@@ -234,14 +239,8 @@ export async function payWithContract(args: {
   });
   let pqSignature: Hex = "0x";
   if (!authenticated) {
-    if (ep.environment === "LOCAL DEVNET") {
-      const status = await keyStatus(ep, request.merchant);
-      if (!status.publicKey) throw new Error("The merchant key is not registered on the devnet.");
-      pqSignature = mockPqSignature(status.publicKey, requestMessageBytes(request));
-    } else {
-      if (!args.signature.pq) throw new Error("This request has no ML-DSA-87 signature.");
-      pqSignature = base64ToHex(args.signature.pq.signature);
-    }
+    if (!args.signature.pq) throw new Error("This request has no ML-DSA-87 signature.");
+    pqSignature = base64ToHex(args.signature.pq.signature);
   }
   const req = tuple(request);
   let hash: Hex;

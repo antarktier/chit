@@ -195,7 +195,29 @@ test("full flow: register, partial + final payment, duplicate refused, receipt a
     await fetch(`${api}/v1/merchants/${merchant.address}/summary`)
   ).json()) as { byStatus: Record<string, number> };
   expect(summary.byStatus.completed).toBeGreaterThanOrEqual(1);
+  expect(summary).toMatchObject({
+    byAsset: [
+      {
+        asset: NATIVE_ASSET,
+        requested: req.amount.toString(),
+        received: req.amount.toString(),
+        outstanding: "0",
+      },
+    ],
+  });
 }, 60_000);
+
+test("concurrent submissions of the same signed request are idempotent", async () => {
+  const req = makeRequest(1n);
+  const body = {
+    request: serializeRequest(req),
+    signature: signRequest(req, classical, pq),
+    details: "Integration invoice",
+  };
+  const replies = await Promise.all([post("/v1/requests", body), post("/v1/requests", body)]);
+  expect(replies.map((reply) => reply.status).sort((a, b) => a - b)).toEqual([200, 201]);
+  expect(replies.map((reply) => reply.body.id)).toEqual([requestId(req), requestId(req)]);
+});
 
 test("security: tampered amount, foreign key, wrong contract, reused reference and bad details are rejected", async () => {
   const req = makeRequest(5n * 10n ** 17n, false);

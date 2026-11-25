@@ -706,6 +706,10 @@ fieldset {
   white-space: normal;
 }
 
+.receipt .data-table time {
+  white-space: nowrap;
+}
+
 @media print {
   .customer-bar,
   .customer-footer,

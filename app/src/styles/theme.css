@@ -132,8 +132,7 @@ kbd,
   text-align: center;
   transition:
     transform 0.12s ease,
-    opacity 0.12s ease,
-    background-color 0.15s ease;
+    opacity 0.12s ease;
 }
 
 .primary.compact,
@@ -228,9 +227,17 @@ kbd,
   background: var(--hover);
 }
 
-.segments button {
+.segments [role="radio"],
+.chips [role="radio"] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--control);
+  cursor: pointer;
+}
+
+.segments [role="radio"] {
   flex: 1;
-  min-height: 36px;
   padding: 0 12px;
   border: 0;
   border-radius: var(--radius-pill);
@@ -238,13 +245,25 @@ kbd,
   color: var(--muted);
   font-size: var(--fs-sm);
   font-weight: 500;
-  white-space: nowrap;
+  text-align: center;
 }
 
-.segments button[aria-selected="true"] {
+.segments [aria-checked="true"] {
   background: var(--surface);
   color: var(--ink);
   font-weight: 600;
+}
+
+@media (max-width: 480px) {
+  .segments:has([role="radio"]:nth-of-type(3)) {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    border-radius: var(--radius-control);
+  }
+
+  .segments:has([role="radio"]:nth-of-type(3)) [role="radio"] {
+    border-radius: var(--radius-control);
+  }
 }
 
 /* Filter chips */
@@ -254,9 +273,8 @@ kbd,
   gap: 8px;
 }
 
-.chips button {
+.chips [role="radio"] {
   flex: none;
-  min-height: 36px;
   padding: 0 14px;
   border: 0;
   border-radius: var(--radius-pill);
@@ -267,18 +285,18 @@ kbd,
   white-space: nowrap;
 }
 
-.chips button span {
+.chips [role="radio"] span {
   margin-left: 4px;
   color: var(--muted);
   font-variant-numeric: tabular-nums;
 }
 
-.chips button[aria-checked="true"] {
+.chips [aria-checked="true"] {
   background: var(--accent);
   color: var(--on-accent);
 }
 
-.chips button[aria-checked="true"] span {
+.chips [aria-checked="true"] span {
   color: inherit;
   opacity: 0.78;
 }
@@ -935,6 +953,7 @@ button.row:hover {
 
 /* Data Table (Recall .forms inside squircle .data-panel, crisp 0px cell corners) */
 .table-scroll {
+  position: relative;
   overflow-x: auto;
 }
 

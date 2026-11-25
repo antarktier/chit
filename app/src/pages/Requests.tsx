@@ -21,14 +21,17 @@ const order: PaymentStatus[] = ["unpaid", "partially_paid", "completed", "overpa
 
 /** QOR totals only: amounts of different assets are never added together. */
 export function nativeTotals(s: MerchantSummary) {
-  if (s.byAsset) return s.byAsset.find((row) => /^0x0{40}$/i.test(row.asset));
-  return s;
+  return s.byAsset?.find((row) => /^0x0{40}$/i.test(row.asset));
 }
 
-function AssetAmount({ value, asset }: { value: string; asset: string }) {
+export function AssetAmount({ value, asset }: { value: string; asset: string }) {
   const { ep } = useApp();
   const info = useAsset(ep, asset);
-  return info ? <Amount value={value} asset={info} /> : <span className="tabular">{value}</span>;
+  return info ? (
+    <Amount value={value} asset={info} />
+  ) : (
+    <span className="tabular">{formatUnits(value, 0)} base units</span>
+  );
 }
 
 export function Requests() {

@@ -191,7 +191,11 @@ export function App() {
   if (route.name === "pay" || route.name === "receipt")
     return (
       <CustomerLayout>
-        {route.name === "pay" ? <Pay id={route.id} /> : <Receipt id={route.id} />}
+        {route.name === "pay" ? (
+          <Pay key={route.id} id={route.id} />
+        ) : (
+          <Receipt key={route.id} id={route.id} />
+        )}
       </CustomerLayout>
     );
 

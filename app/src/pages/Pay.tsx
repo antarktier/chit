@@ -1,18 +1,27 @@
-import { deserializeRequest, verifyRequest, type PaymentRequest } from "@chit/core";
+import {
+  deserializeRequest,
+  EVM_CHAIN_ID,
+  hashDetails,
+  requestId,
+  verifyRequest,
+  type PaymentRequest,
+} from "@chit/core";
 import { CircleCheck, CircleX } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { Hex } from "viem";
-import { paths, useApi, type RequestDetail } from "../api";
+import { paths, reportPayment, useApi, type RequestDetail } from "../api";
 import { explorerTxUrl, keyStatus, useAsset } from "../chain";
 import { Button, EmptyState, SegmentedTabs } from "../components";
 import { exactUnits, formatUnits, parseAmount, unixDate } from "../format";
 import { Link, useApp } from "../state";
 import {
   Amount,
+  CopyButton,
   ExternalLink,
   HashText,
   KeyValue,
   Notice,
+  QrCode,
   StatusBadge,
   TextField,
   When,
@@ -25,13 +34,26 @@ type Verification =
   | { state: "invalid"; reason: string };
 
 /** Verifies the merchant's ML-DSA-87 signature in this browser, against the key registered on chain. */
-export function useVerification(detail: RequestDetail | undefined) {
+export function useVerification(detail: RequestDetail | undefined, id: string): Verification {
   const { ep, status } = useApp();
-  const [result, setResult] = useState<Verification>({ state: "checking" });
+  const contract = status?.chitPay;
+  const payload =
+    detail &&
+    JSON.stringify({
+      id: detail.id,
+      request: detail.request,
+      details: detail.details,
+      signature: detail.signature,
+    });
+  const snapshot = JSON.stringify([id, contract, payload, ep]);
+  const [checked, setChecked] = useState<{ snapshot: string; result: Verification }>();
   useEffect(() => {
-    if (!detail || !status) return;
+    if (!payload || !contract) return;
+    const detail = JSON.parse(payload) as Pick<
+      RequestDetail,
+      "id" | "request" | "details" | "signature"
+    >;
     let live = true;
-    setResult({ state: "checking" });
     void (async () => {
       let request: PaymentRequest;
       try {
@@ -39,10 +61,22 @@ export function useVerification(detail: RequestDetail | undefined) {
       } catch {
         return { state: "invalid", reason: "The request data is malformed." } as const;
       }
-      if (request.payContract.toLowerCase() !== status.chitPay.toLowerCase())
+      if (
+        request.chainId !== EVM_CHAIN_ID ||
+        request.payContract.toLowerCase() !== contract.toLowerCase()
+      )
         return {
           state: "invalid",
           reason: "The request names a different payment contract.",
+        } as const;
+      if (
+        detail.id !== id ||
+        requestId(request) !== id ||
+        hashDetails(detail.details) !== request.detailsHash
+      )
+        return {
+          state: "invalid",
+          reason: "The link or payment details do not match the signed request.",
         } as const;
       const key = await keyStatus(ep, request.merchant);
       if (!key.registered || !key.possessionProven || !key.publicKey)
@@ -64,12 +98,12 @@ export function useVerification(detail: RequestDetail | undefined) {
             reason: "The merchant's key could not be read from QoreChain.",
           }) as const,
       )
-      .then((next) => live && setResult(next));
+      .then((result) => live && setChecked({ snapshot, result }));
     return () => {
       live = false;
     };
-  }, [detail?.id, status?.chitPay, ep]); // eslint-disable-line react-hooks/exhaustive-deps
-  return result;
+  }, [payload, contract, id, ep, snapshot]);
+  return checked?.snapshot === snapshot ? checked.result : { state: "checking" };
 }
 
 export function VerificationLine({ result }: { result: Verification }) {
@@ -80,8 +114,8 @@ export function VerificationLine({ result }: { result: Verification }) {
       <p className="verify ok">
         <CircleCheck size={18} aria-hidden="true" />
         <span>
-          Signed by the merchant. Your browser checked the ML-DSA-87 signature against the key
-          registered on QoreChain, so the amount, recipient and reference cannot have been changed.
+          Signed by the merchant. Your browser verified the signature against their registered
+          QoreChain key.
         </span>
       </p>
     );
@@ -100,7 +134,7 @@ export function Pay({ id }: { id: string }) {
   const detail = useApi<RequestDetail>(paths.request(id), 4000);
   const data = detail.data;
   const asset = useAsset(ep, data?.request.asset);
-  const verification = useVerification(data);
+  const verification = useVerification(data, id);
   const request = useMemo(() => {
     try {
       return data ? deserializeRequest(data.request) : undefined;
@@ -133,8 +167,10 @@ export function Pay({ id }: { id: string }) {
 
   const rec = data.reconciliation;
   const outstanding = BigInt(rec.outstanding);
-  const expired = rec.status === "expired" || Date.now() / 1000 > Number(data.request.expiresAt);
-  const payable = verification.state === "valid" && outstanding > 0n && !expired;
+  const expired =
+    rec.status === "expired" || BigInt(Math.floor(Date.now() / 1000)) > request.expiresAt;
+  const payable =
+    verification.state === "valid" && outstanding > 0n && !expired && !asset.metadataUnavailable;
   const amountInput = amountText ?? exactUnits(outstanding, asset.decimals);
   const parsed = parseAmount(
     amountInput,
@@ -165,7 +201,10 @@ export function Pay({ id }: { id: string }) {
               amount: parsed.value,
               onStep: setBusy,
             });
-      setSent((prev) => [...prev, { hash, source: effectiveMethod === "memo" ? "native" : "evm" }]);
+      const source = effectiveMethod === "memo" ? "native" : "evm";
+      setSent((prev) => [...prev, { hash, source }]);
+      // Ask the service to index it now; the page keeps polling either way.
+      void reportPayment(hash, source).catch(() => undefined);
       setAmountText(undefined);
     } catch (e) {
       setError(paymentError(e));
@@ -178,6 +217,7 @@ export function Pay({ id }: { id: string }) {
     (s) => !data.events.some((e) => e.txHash.toLowerCase() === s.hash.toLowerCase()),
   );
   const paidAny = BigInt(rec.paid) > 0n;
+  const link = new URL(`/pay/${id}`, window.location.origin).href;
 
   return (
     <div className="pay section-stack">
@@ -197,6 +237,14 @@ export function Pay({ id }: { id: string }) {
           items={[
             { label: "Reference", value: <span className="mono">{data.request.reference}</span> },
             { label: "Pay to", value: <span className="mono wrap">{data.request.recipient}</span> },
+            ...(!asset.native
+              ? [
+                  {
+                    label: "Token contract",
+                    value: <span className="mono wrap">{asset.address}</span>,
+                  },
+                ]
+              : []),
             {
               label: "Merchant key",
               value: <span className="mono wrap">{data.request.merchant}</span>,
@@ -220,6 +268,17 @@ export function Pay({ id }: { id: string }) {
         />
       </section>
 
+      {status &&
+        data.events
+          .filter((event) => event.class === "pending")
+          .map((event) => (
+            <Notice
+              key={event.key}
+              title={`${formatUnits(event.confirmations, 0)} of ${formatUnits(status.minConfirmations, 0)} confirmations`}
+            >
+              <Amount value={event.amount} asset={asset} />
+            </Notice>
+          ))}
       {unseen.length > 0 && (
         <Notice tone="success" title="Payment sent">
           Chit counts it after {status ? formatUnits(status.minConfirmations, 0) : "a few"}{" "}
@@ -250,6 +309,11 @@ export function Pay({ id }: { id: string }) {
       {expired && outstanding > 0n && (
         <Notice tone="warn" title="This request has expired">
           Payments sent now do not count toward it. Ask the merchant for a new request.
+        </Notice>
+      )}
+      {asset.metadataUnavailable && outstanding > 0n && !expired && (
+        <Notice tone="warn" title="Token details unavailable">
+          Reload the page before paying. Amounts shown here are in the token's smallest unit.
         </Notice>
       )}
 
@@ -294,6 +358,8 @@ export function Pay({ id }: { id: string }) {
               disabled={
                 Boolean(busy) ||
                 Boolean(amountError) ||
+                unseen.length > 0 ||
+                BigInt(rec.pending) > 0n ||
                 (!local && effectiveMethod === "memo" && !hasQorex())
               }
               onClick={() => void pay()}
@@ -308,6 +374,19 @@ export function Pay({ id }: { id: string }) {
               to pay from this browser.
             </p>
           )}
+        </section>
+      )}
+      {verification.state === "valid" && payable && (
+        <section className="surface-card card-pad" aria-labelledby="pay-share-title">
+          <h2 className="card-title" id="pay-share-title">
+            Share this request
+          </h2>
+          <div className="share">
+            <QrCode value={link} label="QR code for the payment link" />
+            <div className="actions">
+              <CopyButton value={link} label="Copy link" />
+            </div>
+          </div>
         </section>
       )}
     </div>
