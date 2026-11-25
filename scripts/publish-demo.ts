@@ -11,7 +11,11 @@ for (const r of demo.requests) {
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ request: r.request, signature: r.signature, details: r.details }),
   });
-  const body = (await res.json()) as { id?: string; error?: string; reconciliation?: { status: string } };
+  const body = (await res.json()) as {
+    id?: string;
+    error?: string;
+    reconciliation?: { status: string };
+  };
   console.log(res.status, body.id ?? body.error, body.reconciliation?.status ?? "");
   if (!res.ok) process.exitCode = 1;
 }

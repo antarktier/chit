@@ -90,22 +90,23 @@ contract ChitPay {
     function payNative(PaymentRequest calldata req, bytes calldata pqSignature) external payable nonReentrant {
         if (req.asset != address(0)) revert WrongValue();
         bytes32 id = _accept(req, pqSignature, msg.value);
+        // Effects and the log precede the transfer (checks-effects-interactions); a failed transfer reverts all.
+        emit PaymentReceived(id, req.paymentRef, msg.sender, req.recipient, address(0), msg.value, paid[id]);
         (bool ok,) = req.recipient.call{value: msg.value}("");
         if (!ok) revert TransferFailed();
-        emit PaymentReceived(id, req.paymentRef, msg.sender, req.recipient, address(0), msg.value, paid[id]);
     }
 
     /// @notice Pay an ERC-20 request. The payer must approve this contract for `amount` first.
     function payToken(PaymentRequest calldata req, bytes calldata pqSignature, uint256 amount) external nonReentrant {
         if (req.asset == address(0)) revert WrongValue();
         bytes32 id = _accept(req, pqSignature, amount);
+        emit PaymentReceived(id, req.paymentRef, msg.sender, req.recipient, req.asset, amount, paid[id]);
         IERC20Minimal token = IERC20Minimal(req.asset);
         uint256 before = token.balanceOf(req.recipient);
         (bool ok, bytes memory ret) =
             req.asset.call(abi.encodeCall(IERC20Minimal.transferFrom, (msg.sender, req.recipient, amount)));
         if (!ok || (ret.length != 0 && !abi.decode(ret, (bool)))) revert TransferFailed();
         if (token.balanceOf(req.recipient) - before != amount) revert TransferFailed();
-        emit PaymentReceived(id, req.paymentRef, msg.sender, req.recipient, req.asset, amount, paid[id]);
     }
 
     function _accept(PaymentRequest calldata req, bytes calldata pqSignature, uint256 amount)

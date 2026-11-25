@@ -39,7 +39,7 @@ export function rowToEvent(r: EventRow): PaymentEvent {
   };
 }
 
-function insertEvent(e: PaymentEvent, key: string, now: string): Statement {
+export function insertEvent(e: PaymentEvent, key: string, now: string): Statement {
   // INSERT OR IGNORE on the (source, txHash, index) key makes indexing idempotent.
   return [
     "INSERT OR IGNORE INTO events (key, request_id, source, tx_hash, idx, block_height, block_time, payer, recipient, asset, amount, indexed_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",

@@ -23,7 +23,8 @@
     "diana:demo": "bun scripts/diana.ts demo",
     "build:contracts": "forge build",
     "service:dev": "bun service/src/local.ts",
-    "build:service": "bun build service/src/worker.ts --target browser --format esm --outfile service/dist/worker.js"
+    "build:service": "bun build service/src/worker.ts --target browser --format esm --outfile service/dist/worker.js",
+    "devnet": "bun scripts/devnet.ts"
   },
   "dependencies": {
     "@chit/core": "workspace:*",

@@ -3,8 +3,11 @@ import type { MessageSignature } from "@qorechain/qoresign";
 import {
   buildReceipt,
   deserializeRequest,
+  eventKey,
   EVM_CHAIN_ID,
   explorerTx,
+  NATIVE_CHAIN_ID,
+  nativePaymentEvents,
   hashDetails,
   isValidReference,
   requestId,
@@ -18,8 +21,8 @@ import {
 import { bytesToHex, getAddress, hexToBytes, isAddress, type Hex } from "viem";
 import { z, ZodError } from "zod";
 import type { ChainSource } from "./chain";
-import type { Config } from "./config";
-import { reconcileStored } from "./indexer";
+import { originAllowed, type Config } from "./config";
+import { insertEvent, reconcileStored, refreshStatuses } from "./indexer";
 import type { Store } from "./store";
 
 export class HttpError extends Error {
@@ -49,6 +52,10 @@ const createBody = z.strictObject({
   request: serializedRequest,
   signature: z.looseObject({ signatureType: z.string() }),
   details: z.string().max(2000),
+});
+const paymentBody = z.strictObject({
+  txHash: z.string().regex(/^(0x)?[0-9a-fA-F]{64}$/),
+  source: z.enum(["evm", "native"]),
 });
 const listQuery = z.strictObject({
   status: z.enum(["unpaid", "partially_paid", "completed", "overpaid", "expired"]).optional(),
@@ -298,6 +305,10 @@ export function api(store: Store, chain: ChainSource, cfg: Config) {
       return json({
         environment: cfg.environment,
         chainId: EVM_CHAIN_ID.toString(),
+        nativeChainId: NATIVE_CHAIN_ID,
+        evmUrl: cfg.evmUrl,
+        restUrl: cfg.restUrl,
+        explorer: cfg.explorer,
         chitPay: cfg.chitPay,
         headHeight: h.toString(),
         indexedHeight: indexed.toString(),
@@ -486,6 +497,35 @@ export function api(store: Store, chain: ChainSource, cfg: Config) {
         });
       }
     }
+    if (req.method === "POST" && parts[1] === "payments" && parts.length === 2) {
+      // Fast path: index one tx now. The server reads the tx from chain and never trusts the client.
+      const body = paymentBody.parse(await req.json().catch(() => ({})));
+      const hash = (
+        body.txHash.startsWith("0x") ? body.txHash : `0x${body.txHash}`
+      ).toLowerCase() as Hex;
+      let events;
+      if (body.source === "evm") events = await chain.evmTxEvents(hash);
+      else {
+        const tx = await chain.nativeTx(hash);
+        events = tx ? nativePaymentEvents(tx) : [];
+      }
+      const ids = new Set(
+        (await store.all<{ id: string }>("SELECT id FROM requests")).map((r) => r.id),
+      );
+      const matched = events.filter((e) => ids.has(e.requestId.toLowerCase()));
+      if (!matched.length)
+        throw new HttpError(404, "No confirmed Chit payment found in this transaction yet");
+      const now = new Date().toISOString();
+      await store.batch(matched.map((e) => insertEvent(e, eventKey(e), now)));
+      await refreshStatuses(store, await chain.head(), cfg);
+      return json(
+        {
+          requestIds: [...new Set(matched.map((e) => e.requestId.toLowerCase()))],
+          events: matched.length,
+        },
+        202,
+      );
+    }
     if (
       req.method === "GET" &&
       parts[1] === "payments" &&
@@ -509,7 +549,7 @@ export function api(store: Store, chain: ChainSource, cfg: Config) {
   return async function handle(req: Request): Promise<Response> {
     const origin = req.headers.get("origin");
     const cors: Record<string, string> =
-      origin && cfg.corsOrigins.includes(origin)
+      origin && originAllowed(origin, cfg.corsOrigins)
         ? {
             "access-control-allow-origin": origin,
             "access-control-allow-methods": "GET, POST, OPTIONS",

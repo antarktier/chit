@@ -8,3 +8,6 @@ fs_permissions = [{ access = "read", path = "./contracts/test/fixtures" }]
 
 [rpc_endpoints]
 qorechain_diana = "https://evm-testnet.qore.host"
+
+[lint]
+lint_on_build = false
