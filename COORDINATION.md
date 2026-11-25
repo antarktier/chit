@@ -8,7 +8,7 @@ Two workers share this repo.
 
 ## Live Diana deployment (`deployments/diana.json`)
 
-- ChitPay: `0x7c7773509CA77C398bd1cFd270A26B5b8Fad4236` (EVM chain 9800), deploy block in `deployments/diana.json`.
+- ChitPay: `0x0B0dCCbbE4379c02cf9743153aF9B670Ab7BfFdb` (EVM chain 9800), deploy block in `deployments/diana.json`.
 - Demo requests and txs: `deployments/diana-demo.json` (one 2-instalment ChitPay payment, one native memo payment plus an accidental duplicate).
 
 ## Public hosts (user rule: antarktier.com only, workers.dev disabled)
