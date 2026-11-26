@@ -58,8 +58,7 @@ test.each([
     upstream + path,
     expect.objectContaining({
       method: "GET",
-      cache: "no-store",
-      redirect: "error",
+      redirect: "manual",
       headers: new Headers({ "user-agent": "Chit/1.0" }),
     }),
   );
@@ -69,6 +68,23 @@ test.each([
   expect(response.headers.get("access-control-allow-origin")).toBe(origin);
   expect(response.headers.get("vary")).toBe("origin");
   expect(response.headers.has("set-cookie")).toBe(false);
+});
+
+test.each([302, 304])("returns 502 for upstream status %i", async (status) => {
+  const fetchMock = vi
+    .fn<typeof fetch>()
+    .mockResolvedValue(new Response(null, { status, headers: { location: upstream + txPath } }));
+  vi.stubGlobal("fetch", fetchMock);
+
+  const response = await proxy(txPath);
+
+  expect(fetchMock).toHaveBeenCalledExactlyOnceWith(
+    upstream + txPath,
+    expect.objectContaining({ redirect: "manual" }),
+  );
+  expect(response.status).toBe(502);
+  expect(await response.json()).toEqual({ error: "QoreChain REST is unavailable" });
+  expect(response.headers.get("cache-control")).toBe("no-store");
 });
 
 test("handles broadcast preflight locally and forwards the POST body verbatim", async () => {

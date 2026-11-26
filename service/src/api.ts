@@ -165,10 +165,12 @@ async function qoreProxy(req: Request, url: URL, restUrl: string) {
       method: req.method,
       headers,
       body,
-      cache: "no-store",
-      redirect: "error",
+      redirect: "manual",
       signal: AbortSignal.timeout(15_000),
     });
+    if (upstream.status >= 300 && upstream.status < 400) {
+      throw new Error("Unexpected QoreChain REST redirect");
+    }
   } catch {
     return json({ error: "QoreChain REST is unavailable" }, 502, { "cache-control": "no-store" });
   }
