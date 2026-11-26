@@ -136,7 +136,10 @@ export function Receipt({ id }: { id: string }) {
         <h2 id="checks-title" className="card-title">
           Checks done in your browser
         </h2>
-        <VerificationLine result={verification} />
+        <VerificationLine
+          result={verification}
+          settled={r.status === "completed" || r.status === "overpaid"}
+        />
         {attested === undefined ? (
           <p className="verify muted">
             The service has no attestation key, so the receipt seal was not checked.

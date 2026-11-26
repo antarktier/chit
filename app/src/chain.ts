@@ -1,14 +1,13 @@
 import { useEffect, useState } from "react";
 import { diana, EVM_CHAIN_ID, NATIVE_CHAIN_ID, toBech32 } from "@chit/core";
-import { fetchPqKeyStatus } from "@qorechain/qoresign/network";
 import {
   createPublicClient,
   defineChain,
   getAddress,
+  hexToBytes,
   http,
   parseAbi,
   type Address,
-  type Hex,
 } from "viem";
 import type { Environment, ServiceStatus } from "./api";
 
@@ -72,19 +71,8 @@ export interface KeyStatus {
   publicKey?: Uint8Array;
 }
 
-/**
- * The merchant's registered ML-DSA-87 key. On Diana it comes from the chain's REST API
- * (what the service checks); on the local devnet from the test-only pqcKeyStatus mock.
- */
+/** Reads the merchant key through the EVM RPC on Diana and the local devnet. */
 export async function keyStatus(ep: Endpoints, address: Address): Promise<KeyStatus> {
-  if (ep.environment === "DIANA") {
-    const s = await fetchPqKeyStatus({ rest: ep.rest, address: toBech32(address) });
-    return {
-      registered: s.registered,
-      possessionProven: Boolean(s.possessionProven),
-      publicKey: s.publicKey,
-    };
-  }
   const [registered, , pubkey, possessionProven] = await publicClient(ep.evm).readContract({
     address: PQC_KEY_STATUS,
     abi: pqcAbi,
@@ -94,15 +82,8 @@ export async function keyStatus(ep: Endpoints, address: Address): Promise<KeySta
   return {
     registered,
     possessionProven,
-    publicKey: registered ? hexBytes(pubkey) : undefined,
+    publicKey: registered && pubkey !== "0x" ? hexToBytes(pubkey) : undefined,
   };
-}
-
-function hexBytes(value: Hex) {
-  const clean = value.slice(2);
-  const out = new Uint8Array(clean.length / 2);
-  for (let i = 0; i < out.length; i++) out[i] = parseInt(clean.slice(i * 2, i * 2 + 2), 16);
-  return out;
 }
 
 /** Native QOR balance in uqor (Diana) or EVM wei converted to uqor (local devnet). */

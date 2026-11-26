@@ -27,7 +27,7 @@ No body or query parameters. Returns HTTP 200:
 }
 ```
 
-The indexed height is the EVM cursor, or the configured start block before the cursor exists. `lagBlocks` has a floor of zero. The attestation key is hex when configured.
+The indexed height is the EVM cursor, or the configured start block before the cursor exists. This endpoint only reports lag. Request detail, receipt, and merchant report reads advance the cursor on demand. `lagBlocks` has a floor of zero. The attestation key is hex when configured.
 
 ## Requests
 
@@ -151,7 +151,7 @@ Use a merchant's `0x` address. All three routes accept optional `from` and `to` 
 
 ### `GET /v1/merchants/:address/requests`
 
-Also accepts `status` (a `Status` value), `limit` (integer 1–500, default 50) and `offset` (integer 0–100000, default 0). Returns HTTP 200 with `{ items: RequestSummary[], total: number }`, newest first. `total` counts matching records before pagination. Status and amounts come from the stored indexer snapshot.
+Also accepts `status` (a `Status` value), `limit` (integer 1–500, default 50) and `offset` (integer 0–100000, default 0). Returns HTTP 200 with `{ items: RequestSummary[], total: number }`, newest first. `total` counts matching records before pagination. The read advances payment cursors and refreshes the merchant’s status and amounts before applying filters and pagination.
 
 ```ts
 type RequestSummary = {

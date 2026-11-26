@@ -31,6 +31,7 @@ import { hasQorex, paymentError, payWithContract, payWithMemo } from "../wallet"
 type Verification =
   | { state: "checking" }
   | { state: "valid" }
+  | { state: "key_unavailable" }
   | { state: "invalid"; reason: string };
 
 /** Verifies the merchant's ML-DSA-87 signature in this browser, against the key registered on chain. */
@@ -78,7 +79,8 @@ export function useVerification(detail: RequestDetail | undefined, id: string): 
           state: "invalid",
           reason: "The link or payment details do not match the signed request.",
         } as const;
-      const key = await keyStatus(ep, request.merchant);
+      const key = await keyStatus(ep, request.merchant).catch(() => undefined);
+      if (!key) return { state: "key_unavailable" } as const;
       if (!key.registered || !key.possessionProven || !key.publicKey)
         return {
           state: "invalid",
@@ -95,7 +97,7 @@ export function useVerification(detail: RequestDetail | undefined, id: string): 
         () =>
           ({
             state: "invalid",
-            reason: "The merchant's key could not be read from QoreChain.",
+            reason: "The merchant's signature could not be verified.",
           }) as const,
       )
       .then((result) => live && setChecked({ snapshot, result }));
@@ -106,7 +108,13 @@ export function useVerification(detail: RequestDetail | undefined, id: string): 
   return checked?.snapshot === snapshot ? checked.result : { state: "checking" };
 }
 
-export function VerificationLine({ result }: { result: Verification }) {
+export function VerificationLine({
+  result,
+  settled = false,
+}: {
+  result: Verification;
+  settled?: boolean;
+}) {
   if (result.state === "checking")
     return <p className="verify muted">Checking the merchant's signature…</p>;
   if (result.state === "valid")
@@ -119,10 +127,15 @@ export function VerificationLine({ result }: { result: Verification }) {
         </span>
       </p>
     );
+  const reason =
+    result.state === "key_unavailable"
+      ? "The merchant's key could not be read from QoreChain."
+      : result.reason;
+  if (settled) return <p className="verify muted">{reason}</p>;
   return (
     <p className="verify bad" role="alert">
       <CircleX size={18} aria-hidden="true" />
-      <span>Do not pay this request. {result.reason}</span>
+      <span>Do not pay this request. {reason}</span>
     </p>
   );
 }
@@ -232,7 +245,10 @@ export function Pay({ id }: { id: string }) {
           <StatusBadge status={rec.status} />
         </div>
         <p className="pre-line">{data.details}</p>
-        <VerificationLine result={verification} />
+        <VerificationLine
+          result={verification}
+          settled={rec.status === "completed" || rec.status === "overpaid"}
+        />
         <KeyValue
           items={[
             { label: "Reference", value: <span className="mono">{data.request.reference}</span> },

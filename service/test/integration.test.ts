@@ -291,24 +291,68 @@ test("security: tampered amount, foreign key, wrong contract, reused reference a
   ).toBe(404);
 }, 60_000);
 
-test("indexer picks up payments without the fast path (cron path)", async () => {
-  const req = makeRequest(2n * 10n ** 17n, false);
-  const sig = signRequest(req, classical, pq);
-  await post("/v1/requests", {
-    request: serializeRequest(req),
-    signature: sig,
-    details: "Integration invoice",
-  });
-  await pay(req, bytesToHex(Buffer.from(sig.pq!.signature, "base64")), 2n * 10n ** 17n);
-  const id = requestId(req).toLowerCase();
-  let status = "";
-  for (let i = 0; i < 40 && status !== "completed"; i++) {
-    await new Promise((r) => setTimeout(r, 250));
-    status = (
-      (await (await fetch(`${api}/v1/requests/${id}`)).json()) as {
-        reconciliation: { status: string };
-      }
-    ).reconciliation.status;
-  }
-  expect(status).toBe("completed");
-}, 30_000);
+test.each(["id", "reference", "receipt", "list", "summary"] as const)(
+  "%s read discovers a payment without a transaction report",
+  async (firstRead) => {
+    const req = makeRequest(2n * 10n ** 17n, false);
+    const sig = signRequest(req, classical, pq);
+    expect(
+      (
+        await post("/v1/requests", {
+          request: serializeRequest(req),
+          signature: sig,
+          details: "Integration invoice",
+        })
+      ).status,
+    ).toBe(201);
+    const id = requestId(req);
+    const status = async () =>
+      (await (await fetch(`${api}/v1/status`)).json()) as {
+        indexedHeight: string;
+        lagBlocks: string;
+      };
+    const summaryPath = `/v1/merchants/${merchant.address}/summary`;
+    const previousSummary =
+      firstRead === "summary"
+        ? ((await (await fetch(api + summaryPath)).json()) as { byStatus: { completed: number } })
+        : undefined;
+    const before = await status();
+    await pay(req, bytesToHex(Buffer.from(sig.pq!.signature, "base64")), req.amount);
+    expect((await status()).indexedHeight).toBe(before.indexedHeight);
+
+    const requestPath = `/v1/requests/${id}`;
+    const merchantPath = `/v1/merchants/${merchant.address}`;
+    const paths = {
+      id: requestPath,
+      reference: `/v1/requests/by-reference/${merchant.address}/${req.reference}`,
+      receipt: `${requestPath}/receipt`,
+      list: `${merchantPath}/requests?status=completed`,
+      summary: `${merchantPath}/summary`,
+    };
+    const read = await fetch(api + paths[firstRead]);
+    expect(read.status).toBe(200);
+    const result: unknown = await read.json();
+    switch (firstRead) {
+      case "id":
+      case "reference":
+        expect(result).toMatchObject({ reconciliation: { status: "completed" } });
+        break;
+      case "receipt":
+        expect(result).toMatchObject({ receipt: { status: "completed" } });
+        break;
+      case "list":
+        expect(result).toMatchObject({
+          items: expect.arrayContaining([expect.objectContaining({ id, status: "completed" })]),
+        });
+        break;
+      case "summary":
+        expect(result).toMatchObject({
+          byStatus: { completed: previousSummary!.byStatus.completed + 1 },
+        });
+        break;
+    }
+    const after = await status();
+    expect(BigInt(after.indexedHeight)).toBeGreaterThan(BigInt(before.indexedHeight));
+    expect(after.lagBlocks).toBe("0");
+  },
+);

@@ -21,7 +21,7 @@ import { bytesToHex, getAddress, hexToBytes, isAddress, type Hex } from "viem";
 import { z, ZodError } from "zod";
 import type { ChainSource } from "./chain";
 import { originAllowed, type Config } from "./config";
-import { insertEvent, reconcileStored, refreshStatuses } from "./indexer";
+import { indexOnce, insertEvent, reconcileStored, refreshStatuses } from "./indexer";
 import type { Store } from "./store";
 
 export class HttpError extends Error {
@@ -173,8 +173,17 @@ export function api(store: Store, chain: ChainSource, cfg: Config) {
     return row;
   }
 
-  async function detail(row: RequestRow) {
-    const h = await head();
+  async function scan(scope: { recipient: string } | { merchant: string }) {
+    try {
+      return BigInt((await indexOnce(store, chain, cfg, scope)).head);
+    } catch {
+      // A chain outage must leave already indexed payment evidence readable.
+      return head();
+    }
+  }
+
+  async function detail(row: RequestRow, scanPayments = true) {
+    const h = scanPayments ? await scan({ recipient: row.recipient }) : await head();
     const rec = await reconcileStored(store, row.id, row.request_json, h, cfg);
     return {
       id: row.id,
@@ -324,7 +333,7 @@ export function api(store: Store, chain: ChainSource, cfg: Config) {
         const body = createBody.parse(await req.json().catch(() => ({})));
         const { status, id } = await create(body);
         const row = await loadRow(id);
-        const { rec: _rec, ...out } = await detail(row);
+        const { rec: _rec, ...out } = await detail(row, false);
         return json(out, status);
       }
       if (req.method === "GET" && parts[2] === "by-reference" && parts.length === 5) {
@@ -363,6 +372,7 @@ export function api(store: Store, chain: ChainSource, cfg: Config) {
       const merchant = getAddress(address.parse(parts[2]));
       if (parts[3] === "requests") {
         const q = listQuery.parse(query);
+        await refreshStatuses(store, await scan({ merchant }), cfg, new Date(), merchant);
         const { where, params } = range(merchant, q);
         if (q.status) {
           where.push("status = ?");
@@ -382,6 +392,7 @@ export function api(store: Store, chain: ChainSource, cfg: Config) {
       }
       if (parts[3] === "summary") {
         const q = exportQuery.omit({ format: true }).parse(query);
+        await refreshStatuses(store, await scan({ merchant }), cfg, new Date(), merchant);
         const { where, params } = range(merchant, q);
         const rows = await store.all<RequestRow>(
           `SELECT * FROM requests WHERE ${where.join(" AND ")}`,
@@ -435,12 +446,13 @@ export function api(store: Store, chain: ChainSource, cfg: Config) {
       }
       if (parts[3] === "export") {
         const q = exportQuery.parse(query);
+        const h = await scan({ merchant });
+        await refreshStatuses(store, h, cfg, new Date(), merchant);
         const { where, params } = range(merchant, q);
         const rows = await store.all<RequestRow>(
           `SELECT * FROM requests WHERE ${where.join(" AND ")} ORDER BY created_at`,
           ...params,
         );
-        const h = await head();
         const records = [];
         for (const r of rows) {
           const rec = await reconcileStored(store, r.id, r.request_json, h, cfg);

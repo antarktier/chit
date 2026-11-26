@@ -25,7 +25,7 @@ The deployment command reuses the contract in the manifest when it already has b
 
 ## API Worker and D1
 
-[service/wrangler.toml](../service/wrangler.toml) configures `chit-api.antarktier.com` as a Worker custom domain. It binds D1 as `DB`, sets a one-minute cron for the indexer, and sets `workers_dev = false` and `preview_urls = false`. Set `CHIT_PAY` and `CHIT_START_BLOCK` from the manifest. The Diana configuration uses two confirmations and allows the production app origin and local development origins through CORS.
+[service/wrangler.toml](../service/wrangler.toml) configures `chit-api.antarktier.com` as a Worker custom domain. It binds D1 as `DB` and sets `workers_dev = false` and `preview_urls = false`. Request reads index payments on demand without a cron trigger. Set `CHIT_PAY` and `CHIT_START_BLOCK` from the manifest. The Diana configuration uses two confirmations and allows the production app origin and local development origins through CORS.
 
 For a new Cloudflare account or fresh instance, create a D1 database with `wrangler d1 create chit-diana` and replace the database ID in the config. Run the migration and deploy the Worker from the repository root with an authenticated Wrangler session.
 
@@ -49,7 +49,7 @@ curl -fsS -o /dev/null https://chit.antarktier.com/
 curl -fsS https://chit-api.antarktier.com/v1/status
 ```
 
-Check the app and API return HTTP 200, confirm the returned contract and chain IDs, and compare `indexedHeight` with `headHeight` to see whether the cron indexer has caught up. Confirm both Workers have previews and workers.dev routes disabled.
+Check the app and API return HTTP 200, confirm the returned contract and chain IDs, and compare `indexedHeight` with `headHeight` before and after opening an existing request. If the cursor is behind, successive request reads advance it toward the chain head. Confirm both Workers have previews and workers.dev routes disabled.
 
 ## Demo records
 

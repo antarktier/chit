@@ -22,14 +22,14 @@ The [demo manifest](deployments/diana-demo.json) contains the full request IDs a
 
 ## Features
 
-| Brief requirement                                               | Where to see it                                                                                                                   |
-| --------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| Authenticated payment requests and unique references            | New Request signs the recipient, asset, amount, expiry, reference and payment domain with the merchant's hybrid key.              |
-| Shareable links and QR codes                                    | Request Detail provides the payment link and QR code. The customer page verifies the merchant signature against the on-chain key. |
-| Direct wallet payments in native QOR or supported tokens        | Pay uses QoreX for native memo transfers or submits a ChitPay transaction for QOR or ERC-20 settlement.                           |
-| Partial payments, duplicate detection, expiry and confirmations | Request Detail lists the transactions, confirmation counts and how each payment counts toward the request.                        |
-| Automatic reconciliation and verifiable receipts                | The indexer pulls chain evidence. Chit derives the payment state and verifies each listed receipt transfer against the chain.     |
-| Merchant history and financial export                           | Requests has status filters and payment history. Reports shows totals by asset and exports CSV or JSON.                           |
+| Brief requirement                                               | Where to see it                                                                                                                          |
+| --------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Authenticated payment requests and unique references            | New Request signs the recipient, asset, amount, expiry, reference and payment domain with the merchant's hybrid key.                     |
+| Shareable links and QR codes                                    | Request Detail provides the payment link and QR code. The customer page verifies the merchant signature against the on-chain key.        |
+| Direct wallet payments in native QOR or supported tokens        | Pay uses QoreX for native memo transfers or submits a ChitPay transaction for QOR or ERC-20 settlement.                                  |
+| Partial payments, duplicate detection, expiry and confirmations | Request Detail lists the transactions, confirmation counts and how each payment counts toward the request.                               |
+| Automatic reconciliation and verifiable receipts                | Request reads pull chain evidence on demand. Chit derives the payment state and verifies each listed receipt transfer against the chain. |
+| Merchant history and financial export                           | Requests has status filters and payment history. Reports shows totals by asset and exports CSV or JSON.                                  |
 
 Diana's native chain uses hybrid secp256k1 and ML-DSA-87 signing, including key registration with proof of possession and native QoreX bank sends. ChitPay checks the merchant's ML-DSA-87 signature through Diana's EVM precompiles. EVM settlement uses Diana's scoped authorization windows. A native transfer includes the request ID in its memo, while a contract payment records the ID and reference in an on-chain event. See [architecture](docs/architecture.md) and [security assumptions](docs/threat-model.md).
 
@@ -74,7 +74,7 @@ bunx playwright test
 | Command                                         | Result                                                                                      |
 | ----------------------------------------------- | ------------------------------------------------------------------------------------------- |
 | `bunx vp check` and `bunx vp lint`              | Passed                                                                                      |
-| `bunx vp test run`                              | 39 passed across 9 files                                                                    |
+| `bunx vp test run`                              | 45 passed across 10 files                                                                   |
 | `forge test`                                    | 12 passed across 2 suites                                                                   |
 | `bun run build:app` and `bun run build:service` | Both passed                                                                                 |
 | `cd app && bunx playwright test`                | 6 passed, 3 desktop and 3 mobile. Zero serious or critical axe violations in audited views. |

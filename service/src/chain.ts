@@ -17,8 +17,14 @@ import type { Config } from "./config";
 export interface ChainSource {
   head(): Promise<bigint>;
   paymentLogs(from: bigint, to: bigint, requestId?: Hex): Promise<PaymentEvent[]>;
-  /** Native txs that paid `recipient`, newest first. */
-  nativeTxsTo(recipient: string, page: number, limit: number): Promise<CosmosTxResponse[]>;
+  /** Native txs that paid `recipient` within the requested heights, newest first. */
+  nativeTxsTo(
+    recipient: string,
+    page: number,
+    limit: number,
+    from: bigint,
+    to: bigint,
+  ): Promise<CosmosTxResponse[]>;
   /** PaymentReceived events in one EVM tx (for the fast-path POST /v1/payments). */
   evmTxEvents(hash: Hex): Promise<PaymentEvent[]>;
   /** One native tx by hash, or undefined if not found yet. */
@@ -33,9 +39,15 @@ const pqcAbi = parseAbi([
 ]);
 
 export function dianaSource(cfg: Config): ChainSource {
+  const headers = { "User-Agent": "Chit/1.0" };
   const evm = createPublicClient({
     cacheTime: 0,
-    transport: http(cfg.evmUrl, { timeout: 15_000, retryCount: 2, batch: { batchSize: 40 } }),
+    transport: http(cfg.evmUrl, {
+      timeout: 15_000,
+      retryCount: 2,
+      batch: { batchSize: 40 },
+      fetchOptions: { headers },
+    }),
   });
   return {
     head: () => evm.getBlockNumber(),
@@ -100,6 +112,7 @@ export function dianaSource(cfg: Config): ChainSource {
       const res = await fetch(
         `${cfg.restUrl}/cosmos/tx/v1beta1/txs/${hash.replace(/^0x/, "").toUpperCase()}`,
         {
+          headers,
           signal: AbortSignal.timeout(15_000),
         },
       );
@@ -107,15 +120,16 @@ export function dianaSource(cfg: Config): ChainSource {
       if (!res.ok) throw new Error(`Native tx lookup failed (HTTP ${res.status})`);
       return ((await res.json()) as { tx_response: CosmosTxResponse }).tx_response;
     },
-    async nativeTxsTo(recipient, page, limit) {
+    async nativeTxsTo(recipient, page, limit, from, to) {
       if (cfg.environment === "LOCAL DEVNET") return [];
       const q = new URLSearchParams({
-        query: `transfer.recipient='${recipient}'`,
+        query: `transfer.recipient='${recipient}' AND tx.height >= ${from} AND tx.height <= ${to}`,
         order_by: "ORDER_BY_DESC",
         page: String(page),
         limit: String(limit),
       });
       const res = await fetch(`${cfg.restUrl}/cosmos/tx/v1beta1/txs?${q}`, {
+        headers,
         signal: AbortSignal.timeout(15_000),
       });
       if (!res.ok) throw new Error(`Native tx search failed (HTTP ${res.status})`);
@@ -137,7 +151,11 @@ export function dianaSource(cfg: Config): ChainSource {
           publicKey: pubkey === "0x" ? undefined : hexToBytes(pubkey),
         };
       }
-      const s = await fetchPqKeyStatus({ rest: cfg.restUrl, address: bech32 });
+      const s = await fetchPqKeyStatus({
+        rest: cfg.restUrl,
+        address: bech32,
+        fetch: (url) => fetch(url, { headers, signal: AbortSignal.timeout(15_000) }),
+      });
       return {
         registered: s.registered,
         possessionProven: Boolean(s.possessionProven),

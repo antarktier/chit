@@ -40,18 +40,4 @@ if (process.argv.includes("--index-once")) {
     },
   });
   console.log(`${cfg.environment} API ${server.url}`);
-  let busy = false;
-  const tick = async () => {
-    if (busy) return;
-    busy = true;
-    try {
-      await indexOnce(store, chain, cfg);
-    } catch (error) {
-      console.error("indexer failed:", error instanceof Error ? error.message : error);
-    } finally {
-      busy = false;
-    }
-  };
-  void tick();
-  setInterval(() => void tick(), cfg.environment === "LOCAL DEVNET" ? 1000 : 15_000);
 }

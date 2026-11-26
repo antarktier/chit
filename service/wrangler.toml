@@ -6,9 +6,6 @@ preview_urls = false
 
 routes = [{ pattern = "chit-api.antarktier.com", custom_domain = true }]
 
-[triggers]
-crons = ["* * * * *"]
-
 [[d1_databases]]
 binding = "DB"
 database_name = "chit-diana"
