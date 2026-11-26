@@ -79,7 +79,7 @@ bunx playwright test
 | `bun run build:app` and `bun run build:service` | Both passed                                                                                 |
 | `cd app && bunx playwright test`                | 6 passed, 3 desktop and 3 mobile. Zero serious or critical axe violations in audited views. |
 
-The suites cover request authentication, encoding parity, payment state changes, event deduplication, confirmations, exports and receipt verification. The browser suite uses local devnet. Paying from a browser on Diana requires the QoreX extension for the native route.
+The suites cover request authentication, encoding parity, payment state changes, event deduplication, confirmations, exports and receipt verification. The default browser suite uses local devnet. The separate `bun run test:live` command uses the deployed app and API on Diana. It spends 0.001 testnet QOR plus fees from the funded Chit signing account in `keys/chit-accounts.json`. See the [live test coverage and QoreX steps](docs/threat-model.md#live-browser-verification).
 
 ## Documentation
 
