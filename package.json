@@ -27,6 +27,7 @@
     "build:service": "bun build service/src/worker.ts --target browser --format esm --outfile service/dist/worker.js",
     "devnet": "bun scripts/devnet.ts",
     "test:e2e": "bun --filter @chit/app test:e2e",
+    "test:live": "bun --filter @chit/app test:live",
     "build:app": "bun --filter @chit/app build"
   },
   "dependencies": {

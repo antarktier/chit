@@ -58,6 +58,7 @@ export function artifact(name: string) {
 export async function evmSend(
   account: LocalAccount,
   call: { to?: Address; data?: Hex; value?: bigint },
+  onBroadcast?: (hash: Hex) => void,
 ) {
   const wallet = createWalletClient({ account, transport: http(dianaEndpoints.evm) });
   const [gasPrice, nonce, balance] = await Promise.all([
@@ -80,6 +81,7 @@ export async function evmSend(
     chainId: Number(EVM_CHAIN_ID),
   });
   const hash = await wallet.sendRawTransaction({ serializedTransaction });
+  onBroadcast?.(hash);
   const receipt = await evm.waitForTransactionReceipt({ hash, timeout: 120_000 });
   if (receipt.status !== "success") throw new Error(`EVM transaction reverted: ${hash}`);
   return receipt;

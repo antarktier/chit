@@ -4,11 +4,10 @@ import { addressFromBytes, deriveCanonicalPqKey, deriveClassicalKey } from "@qor
 import { bytesToHex, hexToBytes } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 
-const file = "keys/chit-accounts.json";
 /** merchant deploys ChitPay and signs requests; payer pays them. */
 export const roles = ["merchant", "payer"] as const;
 
-export function chitAccounts(generate = false) {
+export function chitAccounts(generate = false, file = "keys/chit-accounts.json") {
   if (generate && !existsSync(file)) {
     mkdirSync("keys", { recursive: true, mode: 0o700 });
     writeFileSync(
