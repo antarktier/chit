@@ -5,6 +5,7 @@ import {
   deserializeRequest,
   eventKey,
   EVM_CHAIN_ID,
+  fromBech32,
   NATIVE_CHAIN_ID,
   nativePaymentEvents,
   hashDetails,
@@ -93,6 +94,91 @@ function json(body: unknown, status = 200, headers: Record<string, string> = {})
     JSON.stringify(body, (_k, v: unknown) => (typeof v === "bigint" ? v.toString() : v)),
     { status, headers: { "content-type": "application/json; charset=utf-8", ...headers } },
   );
+}
+
+const qorePrefix = "/v1/qore";
+const cosmosTxs = "/cosmos/tx/v1beta1/txs";
+const maxBroadcastBytes = 64 * 1024;
+
+function qoreCache(method: string | null, path: string, search: string) {
+  if (method === "POST" && path === cosmosTxs && !search) return "no-store";
+  if (method !== "GET") return;
+  if (
+    !search &&
+    path.startsWith(cosmosTxs + "/") &&
+    /^[0-9A-F]{64}$/.test(path.slice(cosmosTxs.length + 1))
+  )
+    return "public, max-age=60";
+  const balance = /^\/cosmos\/bank\/v1beta1\/balances\/(qor1[0-9a-z]{38})\/by_denom$/.exec(path);
+  const account = /^\/cosmos\/auth\/v1beta1\/accounts\/(qor1[0-9a-z]{38})$/.exec(path);
+  const address = search === "?denom=uqor" ? balance?.[1] : !search ? account?.[1] : undefined;
+  if (!address) return;
+  try {
+    fromBech32(address);
+    return balance ? "public, max-age=10" : "no-store";
+  } catch {
+    return;
+  }
+}
+
+async function qoreProxy(req: Request, url: URL, restUrl: string) {
+  const path = url.pathname.slice(qorePrefix.length);
+  const preflight = req.method === "OPTIONS";
+  const cache = qoreCache(
+    preflight ? req.headers.get("access-control-request-method") : req.method,
+    path,
+    url.search,
+  );
+  if (!cache) throw new HttpError(404, "Not found");
+  if (preflight) return new Response(null, { status: 204 });
+
+  const headers = new Headers({ "user-agent": "Chit/1.0" });
+  let body: Uint8Array<ArrayBuffer> | undefined;
+  if (req.method === "POST") {
+    const contentType = req.headers.get("content-type");
+    if (contentType?.split(";")[0]?.trim().toLowerCase() !== "application/json")
+      throw new HttpError(415, "Expected application/json");
+    if (Number(req.headers.get("content-length")) > maxBroadcastBytes)
+      throw new HttpError(413, "Broadcast body exceeds 64 KiB");
+    headers.set("content-type", "application/json");
+    const bytes = new Uint8Array(maxBroadcastBytes);
+    let length = 0;
+    if (req.body) {
+      const reader = req.body.getReader();
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        if (length + value.byteLength > bytes.byteLength) {
+          void reader.cancel().catch(() => {});
+          throw new HttpError(413, "Broadcast body exceeds 64 KiB");
+        }
+        bytes.set(value, length);
+        length += value.byteLength;
+      }
+    }
+    body = bytes.subarray(0, length);
+  }
+
+  let upstream: Response;
+  try {
+    upstream = await fetch(restUrl.replace(/\/$/, "") + path + url.search, {
+      method: req.method,
+      headers,
+      body,
+      cache: "no-store",
+      redirect: "error",
+      signal: AbortSignal.timeout(15_000),
+    });
+  } catch {
+    return json({ error: "QoreChain REST is unavailable" }, 502, { "cache-control": "no-store" });
+  }
+  return new Response(upstream.body, {
+    status: upstream.status,
+    headers: {
+      "content-type": "application/json",
+      "cache-control": upstream.status === 200 ? cache : "no-store",
+    },
+  });
 }
 
 function recJson(rec: Reconciliation) {
@@ -302,8 +388,7 @@ export function api(store: Store, chain: ChainSource, cfg: Config) {
     return { where, params };
   }
 
-  async function route(req: Request): Promise<Response> {
-    const url = new URL(req.url);
+  async function route(req: Request, url: URL): Promise<Response> {
     const parts = url.pathname.split("/").filter(Boolean);
     const query = Object.fromEntries(url.searchParams);
     if (parts[0] !== "v1") throw new HttpError(404, "Not found");
@@ -318,7 +403,7 @@ export function api(store: Store, chain: ChainSource, cfg: Config) {
         chainId: EVM_CHAIN_ID.toString(),
         nativeChainId: NATIVE_CHAIN_ID,
         evmUrl: cfg.evmUrl,
-        restUrl: cfg.restUrl,
+        restUrl: cfg.environment === "DIANA" ? url.origin + qorePrefix : cfg.restUrl,
         explorer: cfg.explorer,
         chitPay: cfg.chitPay,
         headHeight: h.toString(),
@@ -600,10 +685,12 @@ export function api(store: Store, chain: ChainSource, cfg: Config) {
           }
         : { vary: "origin" };
     let res: Response;
-    if (req.method === "OPTIONS") res = new Response(null, { status: 204 });
+    const url = new URL(req.url);
+    const proxy = url.pathname === qorePrefix || url.pathname.startsWith(qorePrefix + "/");
+    if (req.method === "OPTIONS" && !proxy) res = new Response(null, { status: 204 });
     else
       try {
-        res = await route(req);
+        res = proxy ? await qoreProxy(req, url, cfg.restUrl) : await route(req, url);
       } catch (error) {
         if (error instanceof HttpError) res = json({ error: error.message }, error.status);
         else if (error instanceof ZodError)
@@ -620,6 +707,7 @@ export function api(store: Store, chain: ChainSource, cfg: Config) {
           res = json({ error: "The service could not complete this request" }, 500);
         }
       }
+    if (proxy && !res.headers.has("cache-control")) res.headers.set("cache-control", "no-store");
     for (const [k, v] of Object.entries(cors)) res.headers.set(k, v);
     res.headers.set("x-content-type-options", "nosniff");
     return res;

@@ -29,6 +29,21 @@ No body or query parameters. Returns HTTP 200:
 
 The indexed height is the EVM cursor, or the configured start block before the cursor exists. This endpoint only reports lag. Request detail, receipt, and merchant report reads advance the cursor on demand. `lagBlocks` has a floor of zero. The attestation key is hex when configured.
 
+On Diana, `restUrl` is the absolute Cosmos REST proxy base on the API origin serving the status request. `evmUrl` is the upstream EVM RPC URL. Local devnet reports its configured endpoints.
+
+## Diana Cosmos REST proxy
+
+The browser uses `/v1/qore` on the Chit API because Diana's Cosmos REST host does not send CORS headers. The proxy applies the API's CORS policy and forwards the upstream status and JSON body.
+
+| Method | Path under `/v1/qore`                              | Query        | Cache-Control on HTTP 200 |
+| ------ | -------------------------------------------------- | ------------ | ------------------------- |
+| GET    | `/cosmos/bank/v1beta1/balances/{address}/by_denom` | `denom=uqor` | `public, max-age=10`      |
+| GET    | `/cosmos/auth/v1beta1/accounts/{address}`          | None         | `no-store`                |
+| GET    | `/cosmos/tx/v1beta1/txs/{hash}`                    | None         | `public, max-age=60`      |
+| POST   | `/cosmos/tx/v1beta1/txs`                           | None         | `no-store`                |
+
+Use a lowercase `qor1` Bech32 account address or a 64-character uppercase hex transaction hash. The broadcast route accepts up to 64 KiB of `application/json` and forwards it as sent. The proxy returns HTTP 404 outside the allowlist and uses `no-store` for error responses.
+
 ## Requests
 
 ### `POST /v1/requests`

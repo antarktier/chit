@@ -9,7 +9,7 @@ import {
   parseAbi,
   type Address,
 } from "viem";
-import type { Environment, ServiceStatus } from "./api";
+import { apiBase, type Environment, type ServiceStatus } from "./api";
 
 export const PQC_KEY_STATUS: Address = "0x0000000000000000000000000000000000000a02";
 const pqcAbi = parseAbi([
@@ -33,12 +33,16 @@ export interface Endpoints {
 export function endpoints(status?: ServiceStatus): Endpoints {
   const environment = status?.environment ?? "DIANA";
   const local = environment === "LOCAL DEVNET";
+  const proxyRest = `${apiBase}/v1/qore`;
+  const statusRest = status?.restUrl?.replace(/\/$/, "");
+  const advertisedProxy =
+    statusRest && statusRest === new URL(proxyRest, globalThis.location?.href).href;
   return {
     environment,
     evm:
       status?.evmUrl ??
       (local ? import.meta.env.VITE_CHIT_LOCAL_EVM || "http://127.0.0.1:8545" : diana.evm),
-    rest: status?.restUrl ?? diana.rest,
+    rest: local ? (status?.restUrl ?? diana.rest) : advertisedProxy ? statusRest : proxyRest,
     explorer: status?.explorer ?? diana.explorer,
   };
 }
